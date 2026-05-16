@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Calc+ | Premium Scientific Calculator</title>
+  <meta name="description" content="Premium Minimalist Scientific & Standard Calculator with advanced memory functions.">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1a1924">
+  <link rel="icon" type="image/svg+xml" href="./icon-192.svg">
+  <link rel="apple-touch-icon" href="./icon-192.svg">
+  <!-- Google Fonts Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app-container">
+    <!-- SCREEN 1: CALCULATOR -->
+    <section id="calculator-screen" class="screen active" aria-label="Calculator">
+      <div class="calc-header">
+        <div class="calc-brand">
+          <span class="calc-title">Calc<span class="accent">+</span></span>
+          <span class="calc-mode">Standard</span>
+          <span id="stealth-dot" class="stealth-dot hidden" title="Solar Active"></span>
+        </div>
+        <div class="calc-status">
+          <span class="solar-panel"></span>
+        </div>
+      </div>
+      
+      <div class="calc-display-area">
+        <div id="calc-history" class="calc-history"></div>
+        <div id="calc-display" class="calc-main-display">0</div>
+      </div>
+
+      <div class="calc-keypad">
+        <!-- Row 1 -->
+        <button class="btn btn-action" data-action="clear" id="btn-ac">AC</button>
+        <button class="btn btn-action" data-action="toggle-sign">+/-</button>
+        <button class="btn btn-action" data-action="percent">%</button>
+        <button class="btn btn-operator" data-operator="÷">÷</button>
+
+        <!-- Row 2 -->
+        <button class="btn btn-number" data-number="7">7</button>
+        <button class="btn btn-number" data-number="8">8</button>
+        <button class="btn btn-number" data-number="9">9</button>
+        <button class="btn btn-operator" data-operator="×">×</button>
+
+        <!-- Row 3 -->
+        <button class="btn btn-number" data-number="4">4</button>
+        <button class="btn btn-number" data-number="5">5</button>
+        <button class="btn btn-number" data-number="6">6</button>
+        <button class="btn btn-operator" data-operator="-">-</button>
+
+        <!-- Row 4 -->
+        <button class="btn btn-number" data-number="1">1</button>
+        <button class="btn btn-number" data-number="2">2</button>
+        <button class="btn btn-number" data-number="3">3</button>
+        <button class="btn btn-operator" data-operator="+">+</button>
+
+        <!-- Row 5 -->
+        <button class="btn btn-number zero" data-number="0">0</button>
+        <button class="btn btn-number" data-action="decimal">.</button>
+        <button class="btn btn-equal" data-action="equal" id="btn-equal">=</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 1.5: ROOM SELECTION -->
+    <section id="room-screen" class="screen hidden" aria-label="Room Selection">
+      <div class="room-container">
+        <div class="brand-avatar big">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#b8aaff"/>
+            <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="#8a78f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="room-header-titles">
+          <h2>Enter Vibe Room</h2>
+          <p>Connect securely with friends using a secret Room ID</p>
+        </div>
+        <form id="room-form" class="room-form">
+          <div class="input-group">
+            <input type="text" id="room-id-input" placeholder="Enter Room ID (e.g. chill-99)" maxlength="25" required autocomplete="off">
+          </div>
+          <button type="submit" class="btn-primary">Join Room</button>
+        </form>
+        <button id="btn-cancel-room" class="btn-subtle">Back to Calculator</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: CHAT INTERFACE (VibeSpace) -->
+    <section id="chat-screen" class="screen hidden" aria-label="VibeSpace Chat">
+      <header class="chat-header">
+        <div class="chat-header-info">
+          <div class="brand-avatar">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#b8aaff"/>
+              <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="#8a78f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="brand-titles">
+            <div class="chat-title-wrap">
+              <h1 class="chat-title">VibeSpace</h1>
+              <span id="header-room-badge" class="room-badge">#room</span>
+            </div>
+            <span class="chat-subtitle"><span class="status-dot"></span><span id="online-status">Secret Room Active</span></span>
+          </div>
+        </div>
+        
+        <div class="chat-header-actions">
+          <button id="btn-burn-chat" class="btn-icon btn-burn" aria-label="Burn Room History" title="Burn History">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+          </button>
+          <button id="btn-settings" class="btn-icon" aria-label="Change Nickname" title="Profile Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </button>
+          <button id="btn-exit-chat" class="btn-exit" aria-label="Quick Lock Chat" title="Instant Lock (Esc)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span>Lock</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="demo-banner" class="demo-banner hidden">
+        <span>⚡ <b>Local Storage Sync Active:</b> Add Firebase config keys in app.js for real-time cloud chat across any device!</span>
+      </div>
+
+      <div id="chat-messages" class="chat-messages-container">
+        <!-- Messages dynamically inserted here -->
+      </div>
+
+      <footer class="chat-footer">
+        <div class="vibe-quick-emojis">
+          <button class="vibe-emoji" data-emoji="🔥">🔥</button>
+          <button class="vibe-emoji" data-emoji="✨">✨</button>
+          <button class="vibe-emoji" data-emoji="🚀">🚀</button>
+          <button class="vibe-emoji" data-emoji="💀">💀</button>
+          <button class="vibe-emoji" data-emoji="😭">😭</button>
+          <button class="vibe-emoji" data-emoji="💖">💖</button>
+          <button class="vibe-emoji" data-emoji="👀">👀</button>
+        </div>
+        <form id="chat-form" class="chat-input-wrapper">
+          <input type="text" id="chat-input" placeholder="Message VibeSpace..." autocomplete="off" maxlength="500" required>
+          <button type="submit" id="btn-send" aria-label="Send message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </footer>
+    </section>
+
+    <!-- NICKNAME & AVATAR MODAL -->
+    <div id="profile-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Your Identity</h2>
+          <p>Customize your profile for the secret chat</p>
+        </div>
+        <div class="avatar-preview-wrap">
+          <div id="avatar-preview" class="avatar-circle" style="background-color: #8a78f7;">V</div>
+        </div>
+        <div class="color-picker-wrap">
+          <button class="color-btn active" data-color="#8a78f7" style="background: #8a78f7;" aria-label="Purple"></button>
+          <button class="color-btn" data-color="#ff8fa3" style="background: #ff8fa3;" aria-label="Pink"></button>
+          <button class="color-btn" data-color="#ffd166" style="background: #ffd166;" aria-label="Yellow"></button>
+          <button class="color-btn" data-color="#06d6a0" style="background: #06d6a0;" aria-label="Mint"></button>
+          <button class="color-btn" data-color="#4cc9f0" style="background: #4cc9f0;" aria-label="Blue"></button>
+        </div>
+        <div class="input-group">
+          <input type="text" id="nickname-input" placeholder="Enter nickname..." maxlength="20">
+        </div>
+        <button id="btn-save-profile" class="btn-primary">Save Profile</button>
+      </div>
+    </div>
+
+    <!-- PWA INSTALL MODAL -->
+    <div id="install-modal" class="modal hidden">
+      <div class="modal-backdrop" id="install-backdrop"></div>
+      <div class="modal-content install-content">
+        <div class="brand-avatar big">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#b8aaff"/>
+            <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="#8a78f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="modal-header">
+          <h2>Install VibeSpace</h2>
+          <p id="install-modal-text">Install this app to your home screen for the best stealth experience.</p>
+        </div>
+        <div id="install-btn-wrap" class="input-group">
+          <button id="btn-pwa-install" class="btn-primary">Install App</button>
+        </div>
+        <button id="btn-pwa-dismiss" class="btn-subtle">Not Now</button>
+      </div>
+    </div>
+
+    <!-- BURN HISTORY CONFIRMATION MODAL -->
+    <div id="burn-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="brand-avatar big burn-icon" style="background: rgba(255, 143, 163, 0.15); border-color: rgba(255, 143, 163, 0.3);">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff8fa3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-2.5 0-4.5 2-4.5 4.5S8.5 10 12 11c3.5 1 4.5 2.5 4.5 4.5S14.5 20 12 20s-4.5-2-4.5-4.5"></path><path d="M12 20v2"></path><path d="M12 2V4"></path></svg>
+        </div>
+        <div class="modal-header">
+          <h2 style="color: var(--danger);">Burn History</h2>
+          <p>Burn all messages in this room? This action is permanent and clears the chat for everyone instantly.</p>
+        </div>
+        <div class="input-group" style="display:flex;gap:12px;">
+          <button id="btn-cancel-burn" class="btn-primary" style="background: var(--bg-surface-elevated); color: var(--text-main); box-shadow: none; border: 1px solid var(--border-light); flex: 1;">Cancel</button>
+          <button id="btn-confirm-burn" class="btn-primary" style="background: var(--danger); box-shadow: 0 6px 20px rgba(255,143,163,0.4); flex: 1;">Yes, Burn it</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CryptoJS CDN for End-to-End Encryption -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <script src="./app.js" type="module"></script>
+</body>
+</html>

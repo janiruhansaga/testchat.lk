@@ -2,7 +2,7 @@
   "name": "Calc+",
   "short_name": "Calc+",
   "description": "Premium Minimalist Scientific & Standard Calculator.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#1a1924",
   "theme_color": "#1a1924",

@@ -1448,6 +1448,25 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+function handlePwaPrompt(e) {
+  deferredPrompt = e;
+  if (window.matchMedia('(display-mode: standalone)').matches || localStorage.getItem('vibe_pwa_dismissed')) {
+    return;
+  }
+  if (installModalText) installModalText.textContent = "Install this app to your home screen for the best full-screen stealth experience.";
+  if (installBtnWrap) installBtnWrap.classList.remove('hidden');
+  if (installModal) installModal.classList.remove('hidden');
+}
+
+if (window._pwaPromptEvent) {
+  handlePwaPrompt(window._pwaPromptEvent);
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  handlePwaPrompt(e);
+});
+
 function checkPwaInstallPrompt() {
   if (window.matchMedia('(display-mode: standalone)').matches || localStorage.getItem('vibe_pwa_dismissed')) {
     return;
@@ -1456,29 +1475,13 @@ function checkPwaInstallPrompt() {
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
   if (isIos) {
-    installModalText.innerHTML = "To install VibeSpace for full-screen stealth mode, tap the Share icon in Safari and select <b>'Add to Home Screen'</b>.";
-    installBtnWrap.classList.add('hidden');
+    if (installModalText) installModalText.innerHTML = "To install VibeSpace for full-screen stealth mode, tap the Share icon in Safari and select <b>'Add to Home Screen'</b>.";
+    if (installBtnWrap) installBtnWrap.classList.add('hidden');
     setTimeout(() => {
       if (installModal) installModal.classList.remove('hidden');
     }, 2000);
   }
 }
-
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  
-  if (window.matchMedia('(display-mode: standalone)').matches || localStorage.getItem('vibe_pwa_dismissed')) {
-    return;
-  }
-
-  installModalText.textContent = "Install this app to your home screen for the best full-screen stealth experience.";
-  installBtnWrap.classList.remove('hidden');
-  
-  setTimeout(() => {
-    if (installModal) installModal.classList.remove('hidden');
-  }, 1500);
-});
 
 if (btnPwaInstall) {
   btnPwaInstall.addEventListener('click', async () => {
@@ -1490,14 +1493,14 @@ if (btnPwaInstall) {
       }
       deferredPrompt = null;
     }
-    installModal.classList.add('hidden');
+    if (installModal) installModal.classList.add('hidden');
   });
 }
 
 if (btnPwaDismiss) {
   btnPwaDismiss.addEventListener('click', () => {
     localStorage.setItem('vibe_pwa_dismissed', 'true');
-    installModal.classList.add('hidden');
+    if (installModal) installModal.classList.add('hidden');
   });
 }
 

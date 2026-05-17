@@ -123,6 +123,19 @@ const btnMic = document.getElementById('btn-mic');
 const recordingIndicator = document.getElementById('recording-indicator');
 const recordingTimeEl = document.getElementById('recording-time');
 
+const replyPreviewBox = document.getElementById('reply-preview-box');
+const replyPreviewAuthor = document.getElementById('reply-preview-author');
+const replyPreviewText = document.getElementById('reply-preview-text');
+const btnCloseReply = document.getElementById('btn-close-reply');
+let currentReplyData = null;
+
+if (btnCloseReply) {
+  btnCloseReply.addEventListener('click', () => {
+    currentReplyData = null;
+    if (replyPreviewBox) replyPreviewBox.classList.add('hidden');
+  });
+}
+
 // --- WEB AUDIO API FOR SUBTLE NOTIFICATION BEEP ---
 let audioCtx = null;
 function playNotificationSound() {
@@ -220,8 +233,9 @@ function calculate(firstOperand, secondOperand, operator) {
 }
 
 function handleEqual() {
-  // 🚨 REAL SECRET TRIGGER CHECK: 7788 + =
-  if (state.displayValue === '7788') {
+  // 🚨 REAL SECRET TRIGGER CHECK: 7788 + = (or custom code)
+  const customUnlock = localStorage.getItem('vibe_custom_unlock') || '7788';
+  if (state.displayValue === customUnlock) {
     state.isDecoyMode = false;
     openRoomSelection();
     return;
@@ -481,6 +495,115 @@ btnSaveProfile.addEventListener('click', () => {
   closeProfileModal();
 });
 
+// --- APP SETTINGS LOGIC ---
+const btnAppSettings = document.getElementById('btn-app-settings');
+const appSettingsModal = document.getElementById('app-settings-modal');
+const customUnlockInput = document.getElementById('custom-unlock-input');
+const btnDeleteRoom = document.getElementById('btn-delete-room');
+const btnCloseAppSettings = document.getElementById('btn-close-app-settings');
+const fontBtns = document.querySelectorAll('.font-btn');
+
+const deleteRoomModal = document.getElementById('delete-room-modal');
+const btnConfirmDeleteRoom = document.getElementById('btn-confirm-delete-room');
+const btnCancelDeleteRoom = document.getElementById('btn-cancel-delete-room');
+const deleteRoomIdTag = document.getElementById('delete-room-id-tag');
+
+function applyChatFontSize(size) {
+  const root = document.documentElement;
+  if (size === 'small') root.style.setProperty('--chat-font-size', '0.8rem');
+  else if (size === 'large') root.style.setProperty('--chat-font-size', '1.15rem');
+  else root.style.setProperty('--chat-font-size', '0.95rem');
+}
+
+// Initial font size apply
+const savedFontSize = localStorage.getItem('vibe_chat_font_size') || 'medium';
+applyChatFontSize(savedFontSize);
+
+if (btnAppSettings) {
+  btnAppSettings.addEventListener('click', () => {
+    const currentSize = localStorage.getItem('vibe_chat_font_size') || 'medium';
+    fontBtns.forEach(btn => {
+      if (btn.dataset.size === currentSize) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+
+    if (customUnlockInput) {
+      customUnlockInput.value = localStorage.getItem('vibe_custom_unlock') || '7788';
+    }
+
+    if (appSettingsModal) appSettingsModal.classList.remove('hidden');
+  });
+}
+
+fontBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    fontBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const size = btn.dataset.size;
+    localStorage.setItem('vibe_chat_font_size', size);
+    applyChatFontSize(size);
+  });
+});
+
+if (customUnlockInput) {
+  customUnlockInput.addEventListener('input', e => {
+    const val = e.target.value.trim();
+    if (/^\d+$/.test(val)) {
+      localStorage.setItem('vibe_custom_unlock', val);
+    }
+  });
+}
+
+if (btnCloseAppSettings) {
+  btnCloseAppSettings.addEventListener('click', () => {
+    if (customUnlockInput) {
+      const val = customUnlockInput.value.trim();
+      if (/^\d+$/.test(val)) {
+        localStorage.setItem('vibe_custom_unlock', val);
+      }
+    }
+    if (appSettingsModal) appSettingsModal.classList.add('hidden');
+  });
+}
+
+if (btnDeleteRoom) {
+  btnDeleteRoom.addEventListener('click', () => {
+    if (appSettingsModal) appSettingsModal.classList.add('hidden');
+    if (deleteRoomIdTag) deleteRoomIdTag.textContent = '#' + state.roomId;
+    if (deleteRoomModal) deleteRoomModal.classList.remove('hidden');
+  });
+}
+
+if (btnCancelDeleteRoom) {
+  btnCancelDeleteRoom.addEventListener('click', () => {
+    if (deleteRoomModal) deleteRoomModal.classList.add('hidden');
+  });
+}
+
+if (btnConfirmDeleteRoom) {
+  btnConfirmDeleteRoom.addEventListener('click', async () => {
+    if (deleteRoomModal) deleteRoomModal.classList.add('hidden');
+    if (!isFirebasePlaceholder && db && messagesCollection) {
+      try {
+        const q = query(messagesCollection, limit(500));
+        const snapshot = await getDocs(q);
+        const deletePromises = [];
+        snapshot.forEach(docSnap => {
+          deletePromises.push(deleteDoc(docSnap.ref));
+        });
+        await Promise.all(deletePromises);
+      } catch (e) {
+        console.error("Error deleting room history:", e);
+      }
+    }
+    const localKey = 'vibe_messages_' + state.roomId;
+    localStorage.removeItem(localKey);
+    localStorage.removeItem('vibe_room_id');
+    showToastNotification("Room deleted permanently 🗑️");
+    lockAndExitChat();
+  });
+}
+
 
 // ==========================================
 // 4. CHAT BACKEND & E2E ENCRYPTION
@@ -668,14 +791,25 @@ async function sendFirebaseMessage(text) {
   if (!text || !messagesCollection) return;
   try {
     const encryptedText = encryptText(text);
+    let replyPayload = null;
+    if (currentReplyData) {
+      replyPayload = {
+        author: currentReplyData.author,
+        text: encryptText(currentReplyData.text)
+      };
+    }
     await addDoc(messagesCollection, {
       text: encryptedText,
       author: state.nickname,
       avatarColor: state.avatarColor,
       createdAt: serverTimestamp(),
       timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isEncrypted: true
+      isEncrypted: true,
+      replyTo: replyPayload
     });
+
+    currentReplyData = null;
+    if (replyPreviewBox) replyPreviewBox.classList.add('hidden');
   } catch (error) {
     console.error("Error sending message:", error);
   }
@@ -766,19 +900,30 @@ function startLocalDemoMode() {
 function sendLocalMessage(text) {
   const localMessages = JSON.parse(localStorage.getItem(getLocalKey()) || '[]');
   const encryptedText = encryptText(text);
+  let replyPayload = null;
+  if (currentReplyData) {
+    replyPayload = {
+      author: currentReplyData.author,
+      text: encryptText(currentReplyData.text)
+    };
+  }
   const newMsg = {
     id: Date.now().toString(),
     text: encryptedText,
     author: state.nickname,
     avatarColor: state.avatarColor,
     timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    isEncrypted: true
+    isEncrypted: true,
+    replyTo: replyPayload
   };
   localMessages.push(newMsg);
   if (localMessages.length > 100) localMessages.shift();
   
   localStorage.setItem(getLocalKey(), JSON.stringify(localMessages));
   window.dispatchEvent(new Event('local_msg_update_' + state.roomId));
+
+  currentReplyData = null;
+  if (replyPreviewBox) replyPreviewBox.classList.add('hidden');
 }
 
 // --- RENDER MESSAGE ---
@@ -793,6 +938,20 @@ function renderMessage(data) {
   if (data.isEncrypted || (data.text && data.text.startsWith('U2Fsd'))) {
     displayText = decryptText(data.text);
   }
+
+  let quotedHtml = '';
+  if (data.replyTo && data.replyTo.author) {
+    let quotedText = data.replyTo.text;
+    if (quotedText && quotedText.startsWith('U2Fsd')) {
+      quotedText = decryptText(quotedText);
+    }
+    quotedHtml = `
+      <div class="quoted-message-box">
+        <span class="quoted-author">${escapeHtml(data.replyTo.author)}</span>
+        <div class="quoted-text">${escapeHtml(quotedText)}</div>
+      </div>
+    `;
+  }
   
   wrap.innerHTML = `
     <div class="msg-avatar" style="background-color: ${data.avatarColor || '#8a78f7'};">
@@ -802,11 +961,27 @@ function renderMessage(data) {
       <div class="msg-header">
         <span class="msg-author">${escapeHtml(data.author)}</span>
         <span class="msg-time">${data.timestampStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <div class="msg-header-actions">
+          <button type="button" class="btn-msg-reply" title="Reply">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a1 1 0 0 1-1.71.71l-6-6a1 1 0 0 1 0-1.42l6-6a1 1 0 0 1 1.71.71v4h4c5 0 9 4 9 9 0 2.82-1.35 5.3-3.46 6.94-.37.28-.92.05-.92-.41 0-.9-1-5.53-8.62-5.53h-1z"></path></svg>
+          </button>
+        </div>
       </div>
-      <div class="msg-bubble">${escapeHtml(displayText)}</div>
+      <div class="msg-bubble">${quotedHtml}${escapeHtml(displayText)}</div>
     </div>
   `;
   
+  const replyBtn = wrap.querySelector('.btn-msg-reply');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      currentReplyData = { author: data.author || 'User', text: displayText };
+      if (replyPreviewAuthor) replyPreviewAuthor.textContent = escapeHtml(data.author || 'User');
+      if (replyPreviewText) replyPreviewText.textContent = escapeHtml(displayText);
+      if (replyPreviewBox) replyPreviewBox.classList.remove('hidden');
+      if (chatInput) chatInput.focus();
+    });
+  }
+
   chatMessages.appendChild(wrap);
 }
 
@@ -1066,6 +1241,49 @@ function handleIncomingMedia(data) {
   }
 }
 
+function startMediaBurnTimer(wrap, durationSec = 120, blobUrl = null) {
+  const container = document.createElement('div');
+  container.className = 'burn-timer-container';
+  container.innerHTML = `
+    <div class="burn-timer-header">
+      <span class="burn-icon">🔥 Disappearing in</span>
+      <span class="burn-time-label"><b class="burn-time-num">2:00</b></span>
+    </div>
+    <div class="burn-progress-bar">
+      <div class="burn-progress-fill" style="width: 100%;"></div>
+    </div>
+  `;
+  const bubble = wrap.querySelector('.msg-bubble');
+  if (bubble) {
+    bubble.appendChild(container);
+  } else {
+    wrap.querySelector('.msg-content').appendChild(container);
+  }
+
+  const timeNum = container.querySelector('.burn-time-num');
+  const fill = container.querySelector('.burn-progress-fill');
+  let timeLeft = durationSec;
+
+  const interval = setInterval(() => {
+    timeLeft--;
+    const mins = Math.floor(timeLeft / 60);
+    const secs = (timeLeft % 60).toString().padStart(2, '0');
+    if (timeNum) timeNum.textContent = `${mins}:${secs}`;
+    if (fill) fill.style.width = `${(timeLeft / durationSec) * 100}%`;
+
+    if (timeLeft <= 0) {
+      clearInterval(interval);
+      wrap.classList.add('burning');
+      setTimeout(() => {
+        wrap.remove();
+        if (blobUrl) {
+          try { URL.revokeObjectURL(blobUrl); } catch(e){}
+        }
+      }, 500);
+    }
+  }, 1000);
+}
+
 function renderMediaMessage(mediaData) {
   const isSelf = mediaData.isSelf;
   const wrap = document.createElement('div');
@@ -1097,6 +1315,11 @@ function renderMediaMessage(mediaData) {
       <div class="msg-header">
         <span class="msg-author">${escapeHtml(mediaData.author)}</span>
         <span class="msg-time">${mediaData.timestampStr}</span>
+        <div class="msg-header-actions">
+          <button type="button" class="btn-msg-reply" title="Reply">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a1 1 0 0 1-1.71.71l-6-6a1 1 0 0 1 0-1.42l6-6a1 1 0 0 1 1.71.71v4h4c5 0 9 4 9 9 0 2.82-1.35 5.3-3.46 6.94-.37.28-.92.05-.92-.41 0-.9-1-5.53-8.62-5.53h-1z"></path></svg>
+          </button>
+        </div>
       </div>
       <div class="msg-bubble p2p-media-bubble">
         <div class="msg-media-box">
@@ -1115,8 +1338,21 @@ function renderMediaMessage(mediaData) {
     </div>
   `;
   
+  const replyBtn = wrap.querySelector('.btn-msg-reply');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      currentReplyData = { author: mediaData.author || 'User', text: `[Attachment: ${mediaData.fileName || 'Media File'}]` };
+      if (replyPreviewAuthor) replyPreviewAuthor.textContent = escapeHtml(mediaData.author || 'User');
+      if (replyPreviewText) replyPreviewText.textContent = `[Attachment: ${mediaData.fileName || 'Media File'}]`;
+      if (replyPreviewBox) replyPreviewBox.classList.remove('hidden');
+      if (chatInput) chatInput.focus();
+    });
+  }
+
   chatMessages.appendChild(wrap);
   scrollToBottom();
+
+  startMediaBurnTimer(wrap, 120, mediaData.blobUrl);
 }
 
 if (btnCamera && cameraFileInput) {
@@ -1182,7 +1418,7 @@ if (btnCamera && cameraFileInput) {
             timestampStr: payload.timestampStr
           });
 
-          showToastNotification("Live stealth photo sent 🔥 (10s burn)");
+          showToastNotification("Live stealth photo sent 🔥 (2m burn)");
         }, 'image/jpeg', 0.85);
       };
     } catch (err) {
@@ -1206,7 +1442,7 @@ function handleIncomingPhoto(data) {
       timestampStr: data.timestampStr
     });
     playNotificationSound();
-    showToastNotification(`Received live photo from ${data.senderNickname} 🔥 (10s burn)`);
+    showToastNotification(`Received live photo from ${data.senderNickname} 🔥 (2m burn)`);
   } catch (err) {
     console.error("[PeerJS] Error processing incoming photo:", err);
   }
@@ -1227,41 +1463,37 @@ function renderPhotoMessage(photoData) {
       <div class="msg-header">
         <span class="msg-author">${escapeHtml(photoData.author)}</span>
         <span class="msg-time">${photoData.timestampStr}</span>
+        <div class="msg-header-actions">
+          <button type="button" class="btn-msg-reply" title="Reply">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a1 1 0 0 1-1.71.71l-6-6a1 1 0 0 1 0-1.42l6-6a1 1 0 0 1 1.71.71v4h4c5 0 9 4 9 9 0 2.82-1.35 5.3-3.46 6.94-.37.28-.92.05-.92-.41 0-.9-1-5.53-8.62-5.53h-1z"></path></svg>
+          </button>
+        </div>
       </div>
       <div class="msg-bubble p2p-media-bubble">
         <div class="msg-photo-box">
           <div class="photo-img-wrap">
             <img src="${photoData.blobUrl}" class="p2p-live-photo" alt="Live Photo Capture">
-            <div class="burn-timer-badge">
-              <span class="burn-icon">🔥</span>
-              <span class="burn-time">10s</span>
-            </div>
           </div>
         </div>
       </div>
     </div>
   `;
   
+  const replyBtn = wrap.querySelector('.btn-msg-reply');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      currentReplyData = { author: photoData.author || 'User', text: '[Live Photo Capture]' };
+      if (replyPreviewAuthor) replyPreviewAuthor.textContent = escapeHtml(photoData.author || 'User');
+      if (replyPreviewText) replyPreviewText.textContent = '[Live Photo Capture]';
+      if (replyPreviewBox) replyPreviewBox.classList.remove('hidden');
+      if (chatInput) chatInput.focus();
+    });
+  }
+
   chatMessages.appendChild(wrap);
   scrollToBottom();
 
-  // 10s auto-burn countdown
-  const timerBadge = wrap.querySelector('.burn-time');
-  let timeLeft = 10;
-  const interval = setInterval(() => {
-    timeLeft--;
-    if (timerBadge) {
-      timerBadge.textContent = timeLeft + 's';
-    }
-    if (timeLeft <= 0) {
-      clearInterval(interval);
-      wrap.classList.add('burning');
-      setTimeout(() => {
-        wrap.remove();
-        try { URL.revokeObjectURL(photoData.blobUrl); } catch(e){}
-      }, 500);
-    }
-  }, 1000);
+  startMediaBurnTimer(wrap, 120, photoData.blobUrl);
 }
 
 // --- VOICE RECORDING (HOLD-TO-RECORD) ---
@@ -1410,6 +1642,11 @@ function renderVoiceMessage(voiceData) {
       <div class="msg-header">
         <span class="msg-author">${escapeHtml(voiceData.author)}</span>
         <span class="msg-time">${voiceData.timestampStr}</span>
+        <div class="msg-header-actions">
+          <button type="button" class="btn-msg-reply" title="Reply">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a1 1 0 0 1-1.71.71l-6-6a1 1 0 0 1 0-1.42l6-6a1 1 0 0 1 1.71.71v4h4c5 0 9 4 9 9 0 2.82-1.35 5.3-3.46 6.94-.37.28-.92.05-.92-.41 0-.9-1-5.53-8.62-5.53h-1z"></path></svg>
+          </button>
+        </div>
       </div>
       <div class="msg-bubble p2p-media-bubble">
         <div class="msg-media-box">
@@ -1421,8 +1658,21 @@ function renderVoiceMessage(voiceData) {
     </div>
   `;
   
+  const replyBtn = wrap.querySelector('.btn-msg-reply');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      currentReplyData = { author: voiceData.author || 'User', text: '[Voice Message 🎤]' };
+      if (replyPreviewAuthor) replyPreviewAuthor.textContent = escapeHtml(voiceData.author || 'User');
+      if (replyPreviewText) replyPreviewText.textContent = '[Voice Message 🎤]';
+      if (replyPreviewBox) replyPreviewBox.classList.remove('hidden');
+      if (chatInput) chatInput.focus();
+    });
+  }
+
   chatMessages.appendChild(wrap);
   scrollToBottom();
+
+  startMediaBurnTimer(wrap, 120, voiceData.blobUrl);
 }
 
 // Initial Setup

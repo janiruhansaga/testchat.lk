@@ -389,6 +389,16 @@ html, body {
   background: rgba(255, 143, 163, 0.1);
 }
 
+.btn-settings-gear {
+  z-index: 20;
+  display: flex !important;
+}
+.btn-settings-gear:hover {
+  color: var(--primary-light);
+  border-color: rgba(138, 120, 247, 0.3);
+  background: rgba(138, 120, 247, 0.1);
+}
+
 .btn-exit {
   display: flex;
   align-items: center;

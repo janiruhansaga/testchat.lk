@@ -496,7 +496,7 @@ btnSaveProfile.addEventListener('click', () => {
 });
 
 // --- APP SETTINGS LOGIC ---
-const btnAppSettings = document.getElementById('btn-app-settings');
+const btnAppSettings = document.getElementById('settings-btn') || document.getElementById('btn-app-settings');
 const appSettingsModal = document.getElementById('app-settings-modal');
 const customUnlockInput = document.getElementById('custom-unlock-input');
 const btnDeleteRoom = document.getElementById('btn-delete-room');

@@ -119,6 +119,9 @@ const btnAttach = document.getElementById('btn-attach');
 const mediaFileInput = document.getElementById('media-file-input');
 const btnCamera = document.getElementById('btn-camera');
 const cameraFileInput = document.getElementById('camera-file-input');
+const btnMic = document.getElementById('btn-mic');
+const recordingIndicator = document.getElementById('recording-indicator');
+const recordingTimeEl = document.getElementById('recording-time');
 
 // --- WEB AUDIO API FOR SUBTLE NOTIFICATION BEEP ---
 let audioCtx = null;
@@ -920,6 +923,8 @@ function setupDataChannel(conn) {
       handleIncomingMedia(data);
     } else if (data && data.type === 'p2p-photo') {
       handleIncomingPhoto(data);
+    } else if (data && data.type === 'p2p-voice') {
+      handleIncomingVoice(data);
     }
   });
 
@@ -1067,13 +1072,21 @@ function renderMediaMessage(mediaData) {
   wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
   
   const initial = mediaData.author ? mediaData.author.charAt(0).toUpperCase() : 'V';
-  const isVideo = mediaData.fileType && mediaData.fileType.startsWith('video');
+  
+  const fileType = mediaData.fileType || '';
+  const isImage = fileType.startsWith('image/');
+  const isVideo = fileType.startsWith('video/');
+  const isAudio = fileType.startsWith('audio/');
 
   let mediaHtml = '';
-  if (isVideo) {
+  if (isImage) {
+    mediaHtml = `<img src="${mediaData.blobUrl}" class="p2p-attachment-image" alt="Image Attachment" style="width: 100%; max-height: 280px; object-fit: cover; border-radius: 8px; display: block;">`;
+  } else if (isVideo) {
     mediaHtml = `<video controls src="${mediaData.blobUrl}" class="p2p-video"></video>`;
-  } else {
+  } else if (isAudio) {
     mediaHtml = `<audio controls src="${mediaData.blobUrl}" class="p2p-audio"></audio>`;
+  } else {
+    mediaHtml = `<div class="file-icon-box" style="padding: 20px; text-align: center; font-size: 2.5rem;">📄</div>`;
   }
 
   wrap.innerHTML = `
@@ -1249,6 +1262,167 @@ function renderPhotoMessage(photoData) {
       }, 500);
     }
   }, 1000);
+}
+
+// --- VOICE RECORDING (HOLD-TO-RECORD) ---
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingTimer = null;
+let recordingStartTime = 0;
+let isRecording = false;
+
+async function startVoiceRecording() {
+  if (isRecording) return;
+  if (state.activeP2PConnections.size === 0) {
+    showToastNotification("P2P Error: No online peers in room to receive voice note.");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) {
+        audioChunks.push(e.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      if (audioChunks.length === 0) return;
+
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      if (audioBlob.size < 500) {
+        showToastNotification("Voice message too short.");
+        return;
+      }
+
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const payload = {
+        type: 'p2p-voice',
+        fileName: `VoiceNote_${Date.now()}.webm`,
+        fileType: audioBlob.type,
+        data: arrayBuffer,
+        senderNickname: state.nickname,
+        senderAvatarColor: state.avatarColor,
+        timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      state.activeP2PConnections.forEach(conn => conn.send(payload));
+
+      renderVoiceMessage({
+        isSelf: true,
+        blobUrl: URL.createObjectURL(audioBlob),
+        author: state.nickname,
+        avatarColor: state.avatarColor,
+        timestampStr: payload.timestampStr
+      });
+
+      showToastNotification("Voice message sent 🎤");
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    if (btnMic) btnMic.classList.add('recording');
+    if (recordingIndicator) recordingIndicator.classList.remove('hidden');
+
+    recordingStartTime = Date.now();
+    if (recordingTimer) clearInterval(recordingTimer);
+    recordingTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = (elapsed % 60).toString().padStart(2, '0');
+      if (recordingTimeEl) recordingTimeEl.textContent = `${mins}:${secs}`;
+    }, 1000);
+
+  } catch (err) {
+    console.warn("Microphone access denied or error:", err);
+    showToastNotification("Microphone access permission required.");
+  }
+}
+
+function stopVoiceRecording() {
+  if (!isRecording || !mediaRecorder) return;
+  isRecording = false;
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+  if (btnMic) btnMic.classList.remove('recording');
+  if (recordingIndicator) recordingIndicator.classList.add('hidden');
+  if (recordingTimeEl) recordingTimeEl.textContent = "0:00";
+
+  try {
+    mediaRecorder.stop();
+  } catch(e){}
+}
+
+if (btnMic) {
+  btnMic.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startVoiceRecording();
+  });
+  window.addEventListener('mouseup', () => {
+    if (isRecording) stopVoiceRecording();
+  });
+
+  btnMic.addEventListener('touchstart', e => {
+    e.preventDefault();
+    startVoiceRecording();
+  });
+  window.addEventListener('touchend', () => {
+    if (isRecording) stopVoiceRecording();
+  });
+}
+
+function handleIncomingVoice(data) {
+  try {
+    const blob = new Blob([data.data], { type: data.fileType || 'audio/webm' });
+    const blobUrl = URL.createObjectURL(blob);
+    renderVoiceMessage({
+      isSelf: false,
+      blobUrl,
+      author: data.senderNickname,
+      avatarColor: data.senderAvatarColor,
+      timestampStr: data.timestampStr
+    });
+    playNotificationSound();
+    showToastNotification(`Received voice note from ${data.senderNickname} 🎤`);
+  } catch (err) {
+    console.error("[PeerJS] Error processing incoming voice:", err);
+  }
+}
+
+function renderVoiceMessage(voiceData) {
+  const isSelf = voiceData.isSelf;
+  const wrap = document.createElement('div');
+  wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  
+  const initial = voiceData.author ? voiceData.author.charAt(0).toUpperCase() : 'V';
+
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background-color: ${voiceData.avatarColor || '#8a78f7'};">
+      ${initial}
+    </div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-author">${escapeHtml(voiceData.author)}</span>
+        <span class="msg-time">${voiceData.timestampStr}</span>
+      </div>
+      <div class="msg-bubble p2p-media-bubble">
+        <div class="msg-media-box">
+          <div class="media-player-wrap">
+            <audio controls src="${voiceData.blobUrl}" class="p2p-audio"></audio>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  chatMessages.appendChild(wrap);
+  scrollToBottom();
 }
 
 // Initial Setup

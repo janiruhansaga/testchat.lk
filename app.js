@@ -10,7 +10,11 @@ import {
   limit, 
   serverTimestamp,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ==========================================
@@ -68,7 +72,13 @@ const state = {
   
   // Realtime Unsubscribe
   unsubscribeChat: null,
-  unsubscribeStealth: null
+  unsubscribeStealth: null,
+  
+  // P2P State
+  peerInstance: null,
+  myPeerId: null,
+  activeP2PConnections: new Map(),
+  unsubscribePeers: null
 };
 
 // --- DOM ELEMENTS ---
@@ -105,6 +115,10 @@ const avatarPreview = document.getElementById('avatar-preview');
 const colorButtons = document.querySelectorAll('.color-btn');
 const btnSaveProfile = document.getElementById('btn-save-profile');
 const quickEmojis = document.querySelectorAll('.vibe-emoji');
+const btnAttach = document.getElementById('btn-attach');
+const mediaFileInput = document.getElementById('media-file-input');
+const btnCamera = document.getElementById('btn-camera');
+const cameraFileInput = document.getElementById('camera-file-input');
 
 // --- WEB AUDIO API FOR SUBTLE NOTIFICATION BEEP ---
 let audioCtx = null;
@@ -328,7 +342,7 @@ function openRoomSelection() {
   calcScreen.classList.remove('active');
   calcScreen.classList.add('hidden');
   
-  roomIdInput.value = localStorage.getItem('vibe_room_id') || 'chill-99';
+  roomIdInput.value = "";
   roomScreen.classList.remove('hidden');
   roomScreen.classList.add('active');
   roomIdInput.focus();
@@ -402,6 +416,7 @@ function lockAndExitChat() {
     state.unsubscribeChat = null;
   }
   
+  cleanupPeerJS();
   startStealthBackgroundListener();
 }
 
@@ -494,6 +509,112 @@ function decryptText(cipherText) {
 }
 
 let messagesCollection = null;
+let toastTimeout = null;
+
+function showToastNotification(message) {
+  const toast = document.getElementById('room-toast');
+  const toastText = document.getElementById('room-toast-text');
+  if (!toast || !toastText) return;
+
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+
+  toastText.textContent = message;
+  toast.classList.add('show');
+
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+    toastTimeout = null;
+  }, 4000);
+}
+
+async function checkRoomAccessTime() {
+  if (state.isDecoyMode) {
+    showToastNotification("Decoy Room initialized securely");
+    return;
+  }
+
+  if (!isFirebasePlaceholder && db) {
+    try {
+      const roomDocRef = doc(db, "rooms", state.roomId);
+      const roomSnap = await getDoc(roomDocRef);
+
+      if (roomSnap.exists()) {
+        const data = roomSnap.data();
+        if (data && data.lastAccessed) {
+          let dateObj = null;
+          if (data.lastAccessed.toDate) {
+            dateObj = data.lastAccessed.toDate();
+          } else if (typeof data.lastAccessed === 'number' || typeof data.lastAccessed === 'string') {
+            dateObj = new Date(data.lastAccessed);
+          }
+
+          if (dateObj && !isNaN(dateObj.getTime())) {
+            const formattedTime = dateObj.toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            showToastNotification(`Room last accessed: ${formattedTime}`);
+          } else {
+            showToastNotification("Room created successfully");
+          }
+        } else {
+          showToastNotification("Room created successfully");
+        }
+
+        // Immediately update with current timestamp
+        await updateDoc(roomDocRef, {
+          lastAccessed: serverTimestamp()
+        });
+      } else {
+        showToastNotification("Room created successfully");
+        await setDoc(roomDocRef, {
+          createdAt: serverTimestamp(),
+          lastAccessed: serverTimestamp()
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Failed to fetch room access timestamp from Firebase, falling back to local:", e);
+      checkRoomAccessTimeLocal();
+    }
+  } else {
+    checkRoomAccessTimeLocal();
+  }
+}
+
+function checkRoomAccessTimeLocal() {
+  if (state.isDecoyMode) {
+    showToastNotification("Decoy Room initialized securely");
+    return;
+  }
+
+  const localKey = `vibe_room_last_accessed_${state.roomId}`;
+  const prevAccess = localStorage.getItem(localKey);
+  
+  if (prevAccess) {
+    const dateObj = new Date(prevAccess);
+    if (!isNaN(dateObj.getTime())) {
+      const formattedTime = dateObj.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      showToastNotification(`Room last accessed: ${formattedTime}`);
+    } else {
+      showToastNotification("Room created successfully");
+    }
+  } else {
+    showToastNotification("Room created successfully");
+  }
+
+  localStorage.setItem(localKey, new Date().toISOString());
+}
 
 function initChatBackend() {
   if (!isFirebasePlaceholder && db) {
@@ -502,12 +623,18 @@ function initChatBackend() {
       demoBanner.classList.add('hidden');
       onlineStatus.textContent = state.isDecoyMode ? "🔒 E2E Encrypted (Innocent Room)" : `🔒 E2E Encrypted (Room: #${state.roomId})`;
       startFirebaseRealtime();
+      checkRoomAccessTime();
+      initPeerJS();
     } catch (e) {
       console.warn("Firebase Init failed, switching to Local Demo mode", e);
       startLocalDemoMode();
+      checkRoomAccessTimeLocal();
+      initPeerJS();
     }
   } else {
     startLocalDemoMode();
+    checkRoomAccessTimeLocal();
+    initPeerJS();
   }
 }
 
@@ -713,6 +840,416 @@ quickEmojis.forEach(btn => {
     chatInput.focus();
   });
 });
+
+// ==========================================
+// P2P WEBRTC MEDIA SHARING (PEERJS)
+// ==========================================
+function initPeerJS() {
+  if (!window.Peer) {
+    console.warn("[PeerJS] Library not loaded");
+    return;
+  }
+  cleanupPeerJS();
+
+  try {
+    const peer = new window.Peer();
+    state.peerInstance = peer;
+
+    peer.on('open', async (id) => {
+      state.myPeerId = id;
+      console.log("[PeerJS] Peer open with ID:", id);
+
+      if (!isFirebasePlaceholder && db && !state.isDecoyMode) {
+        try {
+          const peerRef = doc(db, "rooms", state.roomId, "peers", id);
+          await setDoc(peerRef, {
+            nickname: state.nickname,
+            joinedAt: serverTimestamp()
+          });
+
+          const peersCol = collection(db, "rooms", state.roomId, "peers");
+          state.unsubscribePeers = onSnapshot(peersCol, snapshot => {
+            snapshot.forEach(docSnap => {
+              const otherId = docSnap.id;
+              if (otherId !== state.myPeerId && !state.activeP2PConnections.has(otherId)) {
+                connectToPeer(otherId);
+              }
+            });
+          });
+        } catch (err) {
+          console.warn("[PeerJS] Firebase peer discovery failed, using local fallback", err);
+          startLocalPeerDiscovery(id);
+        }
+      } else {
+        startLocalPeerDiscovery(id);
+      }
+    });
+
+    peer.on('connection', (conn) => {
+      console.log("[PeerJS] Incoming connection from:", conn.peer);
+      setupDataChannel(conn);
+    });
+
+    peer.on('error', (err) => {
+      console.warn("[PeerJS] Error:", err);
+    });
+  } catch (err) {
+    console.error("[PeerJS] Initialization failed:", err);
+  }
+}
+
+function connectToPeer(otherPeerId) {
+  if (!state.peerInstance) return;
+  try {
+    const conn = state.peerInstance.connect(otherPeerId, { reliable: true });
+    setupDataChannel(conn);
+  } catch (err) {
+    console.warn("[PeerJS] Connection error:", err);
+  }
+}
+
+function setupDataChannel(conn) {
+  conn.on('open', () => {
+    console.log("[PeerJS] Data channel open with:", conn.peer);
+    state.activeP2PConnections.set(conn.peer, conn);
+    showToastNotification(`P2P direct stream connected ✨`);
+  });
+
+  conn.on('data', (data) => {
+    if (data && data.type === 'p2p-media') {
+      handleIncomingMedia(data);
+    } else if (data && data.type === 'p2p-photo') {
+      handleIncomingPhoto(data);
+    }
+  });
+
+  conn.on('close', () => {
+    state.activeP2PConnections.delete(conn.peer);
+  });
+
+  conn.on('error', () => {
+    state.activeP2PConnections.delete(conn.peer);
+  });
+}
+
+function startLocalPeerDiscovery(id) {
+  const localKey = 'vibe_peers_' + state.roomId;
+  let peers = JSON.parse(localStorage.getItem(localKey) || '[]');
+  if (!peers.includes(id)) {
+    peers.push(id);
+    localStorage.setItem(localKey, JSON.stringify(peers));
+  }
+
+  peers.forEach(otherId => {
+    if (otherId !== id && !state.activeP2PConnections.has(otherId)) {
+      connectToPeer(otherId);
+    }
+  });
+
+  window.addEventListener('storage', e => {
+    if (e.key === localKey && state.isSecretChatOpen) {
+      const curPeers = JSON.parse(localStorage.getItem(localKey) || '[]');
+      curPeers.forEach(otherId => {
+        if (otherId !== state.myPeerId && !state.activeP2PConnections.has(otherId)) {
+          connectToPeer(otherId);
+        }
+      });
+    }
+  });
+}
+
+async function cleanupPeerJS() {
+  if (state.unsubscribePeers) {
+    state.unsubscribePeers();
+    state.unsubscribePeers = null;
+  }
+  if (state.myPeerId) {
+    if (!isFirebasePlaceholder && db && !state.isDecoyMode) {
+      try {
+        await deleteDoc(doc(db, "rooms", state.roomId, "peers", state.myPeerId));
+      } catch(e) {}
+    }
+    const localKey = 'vibe_peers_' + state.roomId;
+    let peers = JSON.parse(localStorage.getItem(localKey) || '[]');
+    peers = peers.filter(p => p !== state.myPeerId);
+    localStorage.setItem(localKey, JSON.stringify(peers));
+  }
+  if (state.peerInstance) {
+    state.peerInstance.destroy();
+    state.peerInstance = null;
+  }
+  state.activeP2PConnections.clear();
+  state.myPeerId = null;
+}
+
+window.addEventListener('beforeunload', () => {
+  cleanupPeerJS();
+});
+
+if (btnAttach && mediaFileInput) {
+  btnAttach.addEventListener('click', () => {
+    if (state.activeP2PConnections.size === 0) {
+      showToastNotification("P2P Error: No online peers in room to receive file.");
+      return;
+    }
+    mediaFileInput.click();
+  });
+
+  mediaFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (state.activeP2PConnections.size === 0) {
+      showToastNotification("P2P Error: No online peers in room to receive file.");
+      mediaFileInput.value = "";
+      return;
+    }
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const payload = {
+        type: 'p2p-media',
+        fileName: file.name,
+        fileType: file.type,
+        data: arrayBuffer,
+        senderNickname: state.nickname,
+        senderAvatarColor: state.avatarColor,
+        timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      state.activeP2PConnections.forEach(conn => {
+        conn.send(payload);
+      });
+
+      renderMediaMessage({
+        isSelf: true,
+        fileName: file.name,
+        fileType: file.type,
+        blobUrl: URL.createObjectURL(file),
+        author: state.nickname,
+        avatarColor: state.avatarColor,
+        timestampStr: payload.timestampStr
+      });
+
+      showToastNotification("File sent via P2P direct stream 🚀");
+    } catch (err) {
+      console.error("[PeerJS] Error sending file:", err);
+      showToastNotification("Failed to send P2P media file.");
+    } finally {
+      mediaFileInput.value = "";
+    }
+  });
+}
+
+function handleIncomingMedia(data) {
+  try {
+    const blob = new Blob([data.data], { type: data.fileType });
+    const blobUrl = URL.createObjectURL(blob);
+    renderMediaMessage({
+      isSelf: false,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      blobUrl,
+      author: data.senderNickname,
+      avatarColor: data.senderAvatarColor,
+      timestampStr: data.timestampStr
+    });
+    playNotificationSound();
+    showToastNotification(`Received P2P file from ${data.senderNickname} ✨`);
+  } catch (err) {
+    console.error("[PeerJS] Error processing incoming media:", err);
+  }
+}
+
+function renderMediaMessage(mediaData) {
+  const isSelf = mediaData.isSelf;
+  const wrap = document.createElement('div');
+  wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  
+  const initial = mediaData.author ? mediaData.author.charAt(0).toUpperCase() : 'V';
+  const isVideo = mediaData.fileType && mediaData.fileType.startsWith('video');
+
+  let mediaHtml = '';
+  if (isVideo) {
+    mediaHtml = `<video controls src="${mediaData.blobUrl}" class="p2p-video"></video>`;
+  } else {
+    mediaHtml = `<audio controls src="${mediaData.blobUrl}" class="p2p-audio"></audio>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background-color: ${mediaData.avatarColor || '#8a78f7'};">
+      ${initial}
+    </div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-author">${escapeHtml(mediaData.author)}</span>
+        <span class="msg-time">${mediaData.timestampStr}</span>
+      </div>
+      <div class="msg-bubble p2p-media-bubble">
+        <div class="msg-media-box">
+          <div class="media-player-wrap">
+            ${mediaHtml}
+          </div>
+          <div class="media-file-info">
+            <span class="media-name" title="${escapeHtml(mediaData.fileName)}">${escapeHtml(mediaData.fileName)}</span>
+            <a href="${mediaData.blobUrl}" download="${escapeHtml(mediaData.fileName)}" class="btn-save-device">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Save</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  chatMessages.appendChild(wrap);
+  scrollToBottom();
+}
+
+if (btnCamera && cameraFileInput) {
+  btnCamera.addEventListener('click', () => {
+    if (state.activeP2PConnections.size === 0) {
+      showToastNotification("P2P Error: No online peers in room to receive photo.");
+      return;
+    }
+    cameraFileInput.click();
+  });
+
+  cameraFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (state.activeP2PConnections.size === 0) {
+      showToastNotification("P2P Error: No online peers in room to receive photo.");
+      cameraFileInput.value = "";
+      return;
+    }
+
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(async (blob) => {
+          const arrayBuffer = await blob.arrayBuffer();
+          const payload = {
+            type: 'p2p-photo',
+            fileName: file.name || 'live-photo.jpg',
+            fileType: blob.type,
+            data: arrayBuffer,
+            senderNickname: state.nickname,
+            senderAvatarColor: state.avatarColor,
+            timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+
+          state.activeP2PConnections.forEach(conn => conn.send(payload));
+
+          renderPhotoMessage({
+            isSelf: true,
+            blobUrl: URL.createObjectURL(blob),
+            author: state.nickname,
+            avatarColor: state.avatarColor,
+            timestampStr: payload.timestampStr
+          });
+
+          showToastNotification("Live stealth photo sent 🔥 (10s burn)");
+        }, 'image/jpeg', 0.85);
+      };
+    } catch (err) {
+      console.error("[PeerJS] Error capturing photo:", err);
+      showToastNotification("Failed to process live photo.");
+    } finally {
+      cameraFileInput.value = "";
+    }
+  });
+}
+
+function handleIncomingPhoto(data) {
+  try {
+    const blob = new Blob([data.data], { type: data.fileType || 'image/jpeg' });
+    const blobUrl = URL.createObjectURL(blob);
+    renderPhotoMessage({
+      isSelf: false,
+      blobUrl,
+      author: data.senderNickname,
+      avatarColor: data.senderAvatarColor,
+      timestampStr: data.timestampStr
+    });
+    playNotificationSound();
+    showToastNotification(`Received live photo from ${data.senderNickname} 🔥 (10s burn)`);
+  } catch (err) {
+    console.error("[PeerJS] Error processing incoming photo:", err);
+  }
+}
+
+function renderPhotoMessage(photoData) {
+  const isSelf = photoData.isSelf;
+  const wrap = document.createElement('div');
+  wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  
+  const initial = photoData.author ? photoData.author.charAt(0).toUpperCase() : 'V';
+
+  wrap.innerHTML = `
+    <div class="msg-avatar" style="background-color: ${photoData.avatarColor || '#8a78f7'};">
+      ${initial}
+    </div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-author">${escapeHtml(photoData.author)}</span>
+        <span class="msg-time">${photoData.timestampStr}</span>
+      </div>
+      <div class="msg-bubble p2p-media-bubble">
+        <div class="msg-photo-box">
+          <div class="photo-img-wrap">
+            <img src="${photoData.blobUrl}" class="p2p-live-photo" alt="Live Photo Capture">
+            <div class="burn-timer-badge">
+              <span class="burn-icon">🔥</span>
+              <span class="burn-time">10s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  chatMessages.appendChild(wrap);
+  scrollToBottom();
+
+  // 10s auto-burn countdown
+  const timerBadge = wrap.querySelector('.burn-time');
+  let timeLeft = 10;
+  const interval = setInterval(() => {
+    timeLeft--;
+    if (timerBadge) {
+      timerBadge.textContent = timeLeft + 's';
+    }
+    if (timeLeft <= 0) {
+      clearInterval(interval);
+      wrap.classList.add('burning');
+      setTimeout(() => {
+        wrap.remove();
+        try { URL.revokeObjectURL(photoData.blobUrl); } catch(e){}
+      }, 500);
+    }
+  }, 1000);
+}
 
 // Initial Setup
 updateCalcDisplay();

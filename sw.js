@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calc-chat-v1';
+const CACHE_NAME = 'calc-chat-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -14,7 +14,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('[ServiceWorker] Caching app shell');
+        console.log('[ServiceWorker] Caching app shell v2');
         return cache.addAll(ASSETS_TO_CACHE);
       })
       .then(() => self.skipWaiting())
@@ -37,22 +37,24 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch Event
+// Fetch Event (Network-First strategy to ensure latest UI elements are always loaded)
 self.addEventListener('fetch', event => {
-  // We don't cache firebase requests or external API calls if any
   if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('firebase')) {
     return;
   }
   
   event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
+    fetch(event.request)
+      .then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         }
-        return fetch(event.request).catch(() => {
-          // Fallback if offline and request fails
-          return caches.match('./index.html');
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then(cachedResponse => {
+          return cachedResponse || caches.match('./index.html');
         });
       })
   );

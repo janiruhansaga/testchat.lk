@@ -1925,12 +1925,24 @@ showDisguiseScreen();
 
 // --- ANALOG CLOCK INTERACTION LOGIC ---
 let isClockDragging = false;
+let hasStartedClockInteraction = false;
+let clockInactivityTimer = null;
 let draggedHand = null; // 'hour' or 'minute'
 let currentDraggedHour = 12;
 let currentDraggedMinute = 0;
 
+function resetClockInactivityTimer() {
+  if (clockInactivityTimer) clearTimeout(clockInactivityTimer);
+  clockInactivityTimer = setTimeout(() => {
+    if (!isClockDragging) {
+      hasStartedClockInteraction = false;
+      updateClockDisplay();
+    }
+  }, 10000); // Resume real time after 10 seconds of inactivity
+}
+
 function updateClockDisplay() {
-  if (isClockDragging || state.isSecretChatOpen || state.isRoomSelectOpen) return;
+  if (isClockDragging || hasStartedClockInteraction || state.isSecretChatOpen || state.isRoomSelectOpen) return;
   const now = new Date();
   const s = now.getSeconds();
   const m = now.getMinutes();
@@ -1954,6 +1966,19 @@ if (analogClock) {
   analogClock.addEventListener('pointerdown', e => {
     if (state.isSecretChatOpen || state.isRoomSelectOpen) return;
     isClockDragging = true;
+    if (!hasStartedClockInteraction) {
+      const now = new Date();
+      let h = now.getHours() % 12;
+      if (h === 0) h = 12;
+      currentDraggedHour = h;
+      currentDraggedMinute = now.getMinutes();
+      hasStartedClockInteraction = true;
+      
+      // Immediately snap hands to independent clean integer angles to remove real-time fractional drift
+      if (clockHandHour) clockHandHour.style.transform = `rotate(${(currentDraggedHour % 12) * 30}deg)`;
+      if (clockHandMinute) clockHandMinute.style.transform = `rotate(${currentDraggedMinute * 6}deg)`;
+    }
+    resetClockInactivityTimer();
     try { analogClock.setPointerCapture(e.pointerId); } catch(err){}
 
     const rect = analogClock.getBoundingClientRect();
@@ -1971,6 +1996,7 @@ if (analogClock) {
 
   analogClock.addEventListener('pointermove', e => {
     if (!isClockDragging) return;
+    resetClockInactivityTimer();
     handleClockDrag(e);
   });
 
@@ -2001,6 +2027,7 @@ if (analogClock) {
     if (!isClockDragging) return;
     isClockDragging = false;
     try { analogClock.releasePointerCapture(e.pointerId); } catch(err){}
+    resetClockInactivityTimer();
 
     const secretTime = localStorage.getItem('vibe_secret_time') || '12:15';
     const parts = secretTime.split(':');
@@ -2012,6 +2039,8 @@ if (analogClock) {
     const formattedTime = `${String(currentDraggedHour).padStart(2, '0')}:${String(currentDraggedMinute).padStart(2, '0')}`;
 
     if (formattedTime === targetSecret) {
+      if (clockInactivityTimer) clearTimeout(clockInactivityTimer);
+      hasStartedClockInteraction = false;
       state.isDecoyMode = false;
       openRoomSelection();
     }

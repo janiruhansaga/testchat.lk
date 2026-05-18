@@ -1574,3 +1574,40 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
 }
+
+/* --- NATIVE MEDIA DOWNLOAD OVERLAY --- */
+.media-player-wrap, .photo-img-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.btn-download-overlay {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(26, 25, 36, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 15;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.btn-download-overlay:hover {
+  background: var(--gradient-equal);
+  transform: scale(1.05);
+  border-color: transparent;
+  color: white;
+}

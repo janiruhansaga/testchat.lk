@@ -1390,6 +1390,13 @@ function renderMediaMessage(mediaData) {
     mediaHtml = `<div class="file-icon-box" style="padding: 20px; text-align: center; font-size: 2.5rem;">📄</div>`;
   }
 
+  const downloadOverlayHtml = `
+    <a href="${mediaData.blobUrl}" download="${escapeHtml(mediaData.fileName || 'media-attachment')}" class="btn-download-overlay" title="Download Media">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Download</span>
+    </a>
+  `;
+
   wrap.innerHTML = `
     <div class="msg-avatar" style="background-color: ${mediaData.avatarColor || '#8a78f7'};">
       ${initial}
@@ -1408,6 +1415,7 @@ function renderMediaMessage(mediaData) {
         <div class="msg-media-box">
           <div class="media-player-wrap">
             ${mediaHtml}
+            ${downloadOverlayHtml}
           </div>
           <div class="media-file-info">
             <span class="media-name" title="${escapeHtml(mediaData.fileName)}">${escapeHtml(mediaData.fileName)}</span>
@@ -1538,6 +1546,13 @@ function renderPhotoMessage(photoData) {
   
   const initial = photoData.author ? photoData.author.charAt(0).toUpperCase() : 'V';
 
+  const downloadOverlayHtml = `
+    <a href="${photoData.blobUrl}" download="${escapeHtml(photoData.fileName || 'live-photo.jpg')}" class="btn-download-overlay" title="Download Live Photo">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Download</span>
+    </a>
+  `;
+
   wrap.innerHTML = `
     <div class="msg-avatar" style="background-color: ${photoData.avatarColor || '#8a78f7'};">
       ${initial}
@@ -1556,6 +1571,7 @@ function renderPhotoMessage(photoData) {
         <div class="msg-photo-box">
           <div class="photo-img-wrap">
             <img src="${photoData.blobUrl}" class="p2p-live-photo" alt="Live Photo Capture">
+            ${downloadOverlayHtml}
           </div>
         </div>
       </div>
@@ -1717,6 +1733,13 @@ function renderVoiceMessage(voiceData) {
   
   const initial = voiceData.author ? voiceData.author.charAt(0).toUpperCase() : 'V';
 
+  const downloadOverlayHtml = `
+    <a href="${voiceData.blobUrl}" download="${escapeHtml(voiceData.fileName || 'voice-note.webm')}" class="btn-download-overlay" title="Download Voice Note">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Download</span>
+    </a>
+  `;
+
   wrap.innerHTML = `
     <div class="msg-avatar" style="background-color: ${voiceData.avatarColor || '#8a78f7'};">
       ${initial}
@@ -1735,6 +1758,7 @@ function renderVoiceMessage(voiceData) {
         <div class="msg-media-box">
           <div class="media-player-wrap">
             <audio controls src="${voiceData.blobUrl}" class="p2p-audio"></audio>
+            ${downloadOverlayHtml}
           </div>
         </div>
       </div>

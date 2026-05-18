@@ -28,7 +28,7 @@
     <section id="calculator-screen" class="screen active" aria-label="Calculator">
       <div class="calc-header">
         <div class="calc-brand">
-          <span class="calc-title">Calc<span class="accent">+</span></span>
+          <span class="calc-title stealth-header-trigger" title="Hold 2s for Biometric Unlock" style="cursor:pointer; user-select:none; -webkit-user-select:none;">Calc<span class="accent">+</span></span>
           <span class="calc-mode">Standard</span>
           <span id="stealth-dot" class="stealth-dot hidden" title="Solar Active"></span>
         </div>
@@ -78,7 +78,7 @@
     <section id="clock-screen" class="screen hidden" aria-label="Analog Clock Disguise">
       <div class="calc-header" style="width:100%;">
         <div class="calc-brand">
-          <span class="calc-title">Time<span class="accent">+</span></span>
+          <span class="calc-title stealth-header-trigger" title="Hold 2s for Biometric Unlock" style="cursor:pointer; user-select:none; -webkit-user-select:none;">Time<span class="accent">+</span></span>
           <span class="calc-mode">Analog</span>
           <span id="stealth-dot-clock" class="stealth-dot hidden" title="Solar Active"></span>
         </div>
@@ -323,6 +323,16 @@
             <input type="time" id="secret-time-input" value="12:15" autocomplete="off" style="width:100%; background:transparent; border:none; color:white; font-size:1.1rem; outline:none; font-family:inherit;">
           </div>
           <span class="settings-hint">Drag clock hands to this exact time to unlock!</span>
+        </div>
+
+        <div class="settings-section">
+          <label class="settings-label" for="btn-toggle-biometric">Biometric Unlock (TouchID / FaceID)</label>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+            <span class="settings-hint">Long-press "Calc+" or "Time+" for 2s to unlock instantly!</span>
+            <button type="button" id="btn-toggle-biometric" class="btn-toggle" aria-label="Toggle Biometric Unlock">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
         </div>
 
         <div class="settings-section" style="border-top: 1px solid var(--border-light); padding-top: 16px; margin-top: 8px;">

@@ -551,6 +551,30 @@ const customUnlockInput = document.getElementById('custom-unlock-input');
 const btnDeleteRoom = document.getElementById('btn-delete-room');
 const btnCloseAppSettings = document.getElementById('btn-close-app-settings');
 const fontBtns = document.querySelectorAll('.font-btn');
+const btnToggleBiometric = document.getElementById('btn-toggle-biometric');
+
+function updateBiometricToggleUI() {
+  if (!btnToggleBiometric) return;
+  const isEnabled = localStorage.getItem('vibe_biometric_enabled') === 'true';
+  if (isEnabled) btnToggleBiometric.classList.add('active');
+  else btnToggleBiometric.classList.remove('active');
+}
+
+if (btnToggleBiometric) {
+  btnToggleBiometric.addEventListener('click', async () => {
+    const isCurrentlyEnabled = localStorage.getItem('vibe_biometric_enabled') === 'true';
+    if (isCurrentlyEnabled) {
+      localStorage.setItem('vibe_biometric_enabled', 'false');
+      updateBiometricToggleUI();
+      showToastNotification("Biometric unlock disabled.");
+    } else {
+      const success = await registerBiometric();
+      if (success) {
+        updateBiometricToggleUI();
+      }
+    }
+  });
+}
 
 const deleteRoomModal = document.getElementById('delete-room-modal');
 const btnConfirmDeleteRoom = document.getElementById('btn-confirm-delete-room');
@@ -598,6 +622,7 @@ if (btnAppSettings) {
       secretTimeInput.value = localStorage.getItem('vibe_secret_time') || '12:15';
     }
     updateDisguiseModeUI();
+    updateBiometricToggleUI();
 
     if (appSettingsModal) appSettingsModal.classList.remove('hidden');
   });
@@ -1995,3 +2020,131 @@ if (analogClock) {
   analogClock.addEventListener('pointerup', finishClockDrag);
   analogClock.addEventListener('pointercancel', finishClockDrag);
 }
+
+// ==========================================
+// 6. BIOMETRIC WEBAUTHN UNLOCK & STEALTH TRIGGER
+// ==========================================
+async function registerBiometric() {
+  if (!window.PublicKeyCredential) {
+    showToastNotification("Biometric authentication is not supported on this browser/device.");
+    return false;
+  }
+  
+  const randomChallenge = new Uint8Array(32);
+  window.crypto.getRandomValues(randomChallenge);
+  
+  const randomUserId = new Uint8Array(16);
+  window.crypto.getRandomValues(randomUserId);
+
+  try {
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: randomChallenge,
+        rp: {
+          name: "VibeSpace PWA",
+          id: window.location.hostname || "localhost"
+        },
+        user: {
+          id: randomUserId,
+          name: "vibespace-user",
+          displayName: "VibeSpace User"
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },  // ES256
+          { type: "public-key", alg: -257 } // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required"
+        },
+        timeout: 60000
+      }
+    });
+
+    if (cred) {
+      const rawId = Array.from(new Uint8Array(cred.rawId));
+      localStorage.setItem('vibe_webauthn_id', JSON.stringify(rawId));
+      localStorage.setItem('vibe_biometric_enabled', 'true');
+      showToastNotification("Biometric unlock successfully registered! 🔒✨");
+      return true;
+    }
+  } catch (err) {
+    console.error("[WebAuthn] Registration error:", err);
+    showToastNotification("Biometric setup cancelled or failed.");
+    return false;
+  }
+}
+
+async function unlockWithBiometric() {
+  if (!window.PublicKeyCredential) return false;
+  const isEnabled = localStorage.getItem('vibe_biometric_enabled') === 'true';
+  if (!isEnabled) return false;
+
+  const storedIdRaw = localStorage.getItem('vibe_webauthn_id');
+  if (!storedIdRaw) return false;
+
+  let credIdArray;
+  try {
+    credIdArray = new Uint8Array(JSON.parse(storedIdRaw));
+  } catch(e) { return false; }
+
+  const randomChallenge = new Uint8Array(32);
+  window.crypto.getRandomValues(randomChallenge);
+
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: randomChallenge,
+        allowCredentials: [{
+          type: "public-key",
+          id: credIdArray
+        }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    });
+
+    if (assertion) {
+      showToastNotification("Biometric verification successful! 🚀");
+      state.isDecoyMode = false;
+      openRoomSelection();
+      return true;
+    }
+  } catch (err) {
+    console.error("[WebAuthn] Authentication error:", err);
+    showToastNotification("Biometric unlock failed.");
+    return false;
+  }
+}
+
+// 2-Second Long-Press Stealth Trigger on Disguise Screen Headers
+const triggerElements = document.querySelectorAll('.stealth-header-trigger');
+let longPressTimer = null;
+
+triggerElements.forEach(elem => {
+  elem.addEventListener('pointerdown', e => {
+    if (state.isSecretChatOpen || state.isRoomSelectOpen) return;
+    
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(async () => {
+      longPressTimer = null;
+      if (localStorage.getItem('vibe_biometric_enabled') === 'true') {
+        try { if (navigator.vibrate) navigator.vibrate([50, 50]); } catch(e){}
+        await unlockWithBiometric();
+      } else {
+        showToastNotification("Biometric unlock is disabled in Settings.");
+      }
+    }, 2000);
+  });
+
+  const cancelLongPress = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  };
+
+  elem.addEventListener('pointerup', cancelLongPress);
+  elem.addEventListener('pointerleave', cancelLongPress);
+  elem.addEventListener('pointercancel', cancelLongPress);
+});

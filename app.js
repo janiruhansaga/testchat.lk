@@ -64,6 +64,15 @@ const state = {
   nickname: localStorage.getItem('vibe_nickname') || `Viber_${Math.floor(100 + Math.random() * 900)}`,
   avatarColor: localStorage.getItem('vibe_avatar_color') || '#8a78f7',
   roomId: localStorage.getItem('vibe_room_id') || 'chill-99',
+  userId: (() => {
+    let id = localStorage.getItem('vibe_user_id');
+    if (!id) {
+      id = crypto.randomUUID ? crypto.randomUUID() : 'usr_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem('vibe_user_id', id);
+    }
+    return id;
+  })(),
+  userProfiles: new Map(),
   
   // Active Screen
   isSecretChatOpen: false,
@@ -521,6 +530,29 @@ document.addEventListener('keydown', e => {
 // ==========================================
 // 3. MODAL & PROFILE SETTINGS
 // ==========================================
+function updateAllDisplayedAuthors(userId, newNickname, newAvatarColor) {
+  if (!userId) return;
+  const elements = document.querySelectorAll(`[data-user-id="${userId}"]`);
+  elements.forEach(wrap => {
+    const authorEl = wrap.querySelector('.msg-author');
+    if (authorEl) authorEl.textContent = newNickname;
+    const avatarEl = wrap.querySelector('.msg-avatar');
+    if (avatarEl) {
+      avatarEl.style.backgroundColor = newAvatarColor;
+      avatarEl.textContent = newNickname.charAt(0).toUpperCase();
+    }
+  });
+}
+
+function processUserProfile(userId, author, avatarColor) {
+  if (!userId || !author) return;
+  const existing = state.userProfiles.get(userId);
+  if (!existing || existing.nickname !== author || existing.avatarColor !== avatarColor) {
+    state.userProfiles.set(userId, { nickname: author, avatarColor: avatarColor || '#8a78f7' });
+    updateAllDisplayedAuthors(userId, author, avatarColor || '#8a78f7');
+  }
+}
+
 function updateAvatarPreview() {
   const initial = state.nickname ? state.nickname.charAt(0).toUpperCase() : 'V';
   avatarPreview.textContent = initial;
@@ -565,6 +597,7 @@ btnSaveProfile.addEventListener('click', () => {
   state.nickname = nicknameInput.value.trim() || `Viber_${Math.floor(100 + Math.random() * 900)}`;
   localStorage.setItem('vibe_nickname', state.nickname);
   localStorage.setItem('vibe_avatar_color', state.avatarColor);
+  processUserProfile(state.userId, state.nickname, state.avatarColor);
   closeProfileModal();
 });
 
@@ -905,6 +938,13 @@ function startFirebaseRealtime() {
   }
 
   state.unsubscribeChat = onSnapshot(q, (snapshot) => {
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.userId && data.author) {
+        processUserProfile(data.userId, data.author, data.avatarColor);
+      }
+    });
+
     chatMessages.innerHTML = "";
     
     snapshot.forEach((doc) => {
@@ -933,6 +973,7 @@ async function sendFirebaseMessage(text) {
     await addDoc(messagesCollection, {
       text: encryptedText,
       author: state.nickname,
+      userId: state.userId,
       avatarColor: state.avatarColor,
       createdAt: serverTimestamp(),
       timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1000,17 +1041,21 @@ function startLocalDemoMode() {
     ];
     localStorage.setItem(getLocalKey(), JSON.stringify(localMessages));
   } else if (localMessages.length === 0 && state.isDecoyMode) {
-    // Decoy room starts completely empty or with innocent note
     localMessages = [
       { id: '1', text: encryptText("Hey! Did you finish the math homework?"), author: "Alex", avatarColor: "#ffd166", timestampStr: "10:15 AM", isEncrypted: true },
-      { id: '2', text: encryptText("Yeah, page 42 problems 1-5."), author: state.nickname, avatarColor: state.avatarColor, timestampStr: "10:16 AM", isEncrypted: true }
+      { id: '2', text: encryptText("Yeah, page 42 problems 1-5."), author: state.nickname, userId: state.userId, avatarColor: state.avatarColor, timestampStr: "10:16 AM", isEncrypted: true }
     ];
     localStorage.setItem(getLocalKey(), JSON.stringify(localMessages));
   }
 
   function renderAllLocal() {
-    chatMessages.innerHTML = "";
     const msgs = JSON.parse(localStorage.getItem(getLocalKey()) || '[]');
+    msgs.forEach(m => {
+      if (m.userId && m.author) {
+        processUserProfile(m.userId, m.author, m.avatarColor);
+      }
+    });
+    chatMessages.innerHTML = "";
     msgs.forEach(m => renderMessage(m));
     scrollToBottom();
   }
@@ -1041,6 +1086,7 @@ function sendLocalMessage(text) {
   }
   const newMsg = {
     id: Date.now().toString(),
+    userId: state.userId,
     text: encryptedText,
     author: state.nickname,
     avatarColor: state.avatarColor,
@@ -1060,11 +1106,16 @@ function sendLocalMessage(text) {
 
 // --- RENDER MESSAGE ---
 function renderMessage(data) {
-  const isSelf = data.author === state.nickname;
+  const msgUserId = data.userId || (data.author === state.nickname ? state.userId : 'usr_' + data.author);
+  const isSelf = msgUserId === state.userId;
   const wrap = document.createElement('div');
   wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  wrap.setAttribute('data-user-id', msgUserId);
   
-  const initial = data.author ? data.author.charAt(0).toUpperCase() : 'V';
+  const profile = state.userProfiles.get(msgUserId) || { nickname: data.author || 'System', avatarColor: data.avatarColor || '#8a78f7' };
+  const displayAuthor = profile.nickname;
+  const displayAvatarColor = profile.avatarColor;
+  const initial = displayAuthor ? displayAuthor.charAt(0).toUpperCase() : 'V';
   
   let displayText = data.text;
   if (data.isEncrypted || (data.text && data.text.startsWith('U2Fsd'))) {
@@ -1086,12 +1137,12 @@ function renderMessage(data) {
   }
   
   wrap.innerHTML = `
-    <div class="msg-avatar" style="background-color: ${data.avatarColor || '#8a78f7'};">
+    <div class="msg-avatar" style="background-color: ${displayAvatarColor};">
       ${initial}
     </div>
     <div class="msg-content">
       <div class="msg-header">
-        <span class="msg-author">${escapeHtml(data.author)}</span>
+        <span class="msg-author">${escapeHtml(displayAuthor)}</span>
         <span class="msg-time">${data.timestampStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         <div class="msg-header-actions">
           <button type="button" class="btn-msg-reply" title="Reply">
@@ -1276,7 +1327,9 @@ function initiateCallSignal(callType) {
   const payload = {
     type: 'call-signal',
     callType,
+    userId: state.userId,
     senderNickname: state.nickname,
+    senderAvatarColor: state.avatarColor,
     senderPeerId: state.myPeerId
   };
 
@@ -1287,6 +1340,10 @@ function initiateCallSignal(callType) {
 function handleIncomingCallSignal(data) {
   if (state.activeCall || state.localStream || incomingCallBanner.classList.contains('active')) {
     return;
+  }
+
+  if (data.userId && data.senderNickname) {
+    processUserProfile(data.userId, data.senderNickname, data.senderAvatarColor);
   }
 
   state.incomingCall = {
@@ -1588,6 +1645,7 @@ if (btnAttach && mediaFileInput) {
         fileName: file.name,
         fileType: file.type,
         data: arrayBuffer,
+        userId: state.userId,
         senderNickname: state.nickname,
         senderAvatarColor: state.avatarColor,
         timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1602,6 +1660,7 @@ if (btnAttach && mediaFileInput) {
         fileName: file.name,
         fileType: file.type,
         blobUrl: URL.createObjectURL(file),
+        userId: state.userId,
         author: state.nickname,
         avatarColor: state.avatarColor,
         timestampStr: payload.timestampStr
@@ -1619,6 +1678,9 @@ if (btnAttach && mediaFileInput) {
 
 function handleIncomingMedia(data) {
   try {
+    if (data.userId && data.senderNickname) {
+      processUserProfile(data.userId, data.senderNickname, data.senderAvatarColor);
+    }
     const blob = new Blob([data.data], { type: data.fileType });
     const blobUrl = URL.createObjectURL(blob);
     renderMediaMessage({
@@ -1626,6 +1688,7 @@ function handleIncomingMedia(data) {
       fileName: data.fileName,
       fileType: data.fileType,
       blobUrl,
+      userId: data.userId || ('usr_' + data.senderNickname),
       author: data.senderNickname,
       avatarColor: data.senderAvatarColor,
       timestampStr: data.timestampStr
@@ -1681,11 +1744,16 @@ function startMediaBurnTimer(wrap, durationSec = 120, blobUrl = null) {
 }
 
 function renderMediaMessage(mediaData) {
-  const isSelf = mediaData.isSelf;
+  const msgUserId = mediaData.userId || (mediaData.isSelf ? state.userId : 'usr_' + mediaData.author);
+  const isSelf = msgUserId === state.userId;
   const wrap = document.createElement('div');
   wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  wrap.setAttribute('data-user-id', msgUserId);
   
-  const initial = mediaData.author ? mediaData.author.charAt(0).toUpperCase() : 'V';
+  const profile = state.userProfiles.get(msgUserId) || { nickname: mediaData.author || 'System', avatarColor: mediaData.avatarColor || '#8a78f7' };
+  const displayAuthor = profile.nickname;
+  const displayAvatarColor = profile.avatarColor;
+  const initial = displayAuthor ? displayAuthor.charAt(0).toUpperCase() : 'V';
   
   const fileType = mediaData.fileType || '';
   const isImage = fileType.startsWith('image/');
@@ -1711,12 +1779,12 @@ function renderMediaMessage(mediaData) {
   `;
 
   wrap.innerHTML = `
-    <div class="msg-avatar" style="background-color: ${mediaData.avatarColor || '#8a78f7'};">
+    <div class="msg-avatar" style="background-color: ${displayAvatarColor};">
       ${initial}
     </div>
     <div class="msg-content">
       <div class="msg-header">
-        <span class="msg-author">${escapeHtml(mediaData.author)}</span>
+        <span class="msg-author">${escapeHtml(displayAuthor)}</span>
         <span class="msg-time">${mediaData.timestampStr}</span>
         <div class="msg-header-actions">
           <button type="button" class="btn-msg-reply" title="Reply">
@@ -1807,6 +1875,7 @@ if (btnCamera && cameraFileInput) {
             fileName: file.name || 'live-photo.jpg',
             fileType: blob.type,
             data: arrayBuffer,
+            userId: state.userId,
             senderNickname: state.nickname,
             senderAvatarColor: state.avatarColor,
             timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1817,6 +1886,7 @@ if (btnCamera && cameraFileInput) {
           renderPhotoMessage({
             isSelf: true,
             blobUrl: URL.createObjectURL(blob),
+            userId: state.userId,
             author: state.nickname,
             avatarColor: state.avatarColor,
             timestampStr: payload.timestampStr
@@ -1836,11 +1906,15 @@ if (btnCamera && cameraFileInput) {
 
 function handleIncomingPhoto(data) {
   try {
+    if (data.userId && data.senderNickname) {
+      processUserProfile(data.userId, data.senderNickname, data.senderAvatarColor);
+    }
     const blob = new Blob([data.data], { type: data.fileType || 'image/jpeg' });
     const blobUrl = URL.createObjectURL(blob);
     renderPhotoMessage({
       isSelf: false,
       blobUrl,
+      userId: data.userId || ('usr_' + data.senderNickname),
       author: data.senderNickname,
       avatarColor: data.senderAvatarColor,
       timestampStr: data.timestampStr
@@ -1853,11 +1927,16 @@ function handleIncomingPhoto(data) {
 }
 
 function renderPhotoMessage(photoData) {
-  const isSelf = photoData.isSelf;
+  const msgUserId = photoData.userId || (photoData.isSelf ? state.userId : 'usr_' + photoData.author);
+  const isSelf = msgUserId === state.userId;
   const wrap = document.createElement('div');
   wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  wrap.setAttribute('data-user-id', msgUserId);
   
-  const initial = photoData.author ? photoData.author.charAt(0).toUpperCase() : 'V';
+  const profile = state.userProfiles.get(msgUserId) || { nickname: photoData.author || 'System', avatarColor: photoData.avatarColor || '#8a78f7' };
+  const displayAuthor = profile.nickname;
+  const displayAvatarColor = profile.avatarColor;
+  const initial = displayAuthor ? displayAuthor.charAt(0).toUpperCase() : 'V';
 
   const downloadOverlayHtml = `
     <a href="${photoData.blobUrl}" download="${escapeHtml(photoData.fileName || 'live-photo.jpg')}" class="btn-download-overlay" title="Download Live Photo">
@@ -1867,12 +1946,12 @@ function renderPhotoMessage(photoData) {
   `;
 
   wrap.innerHTML = `
-    <div class="msg-avatar" style="background-color: ${photoData.avatarColor || '#8a78f7'};">
+    <div class="msg-avatar" style="background-color: ${displayAvatarColor};">
       ${initial}
     </div>
     <div class="msg-content">
       <div class="msg-header">
-        <span class="msg-author">${escapeHtml(photoData.author)}</span>
+        <span class="msg-author">${escapeHtml(displayAuthor)}</span>
         <span class="msg-time">${photoData.timestampStr}</span>
         <div class="msg-header-actions">
           <button type="button" class="btn-msg-reply" title="Reply">
@@ -1949,6 +2028,7 @@ async function startVoiceRecording() {
         fileName: `VoiceNote_${Date.now()}.webm`,
         fileType: audioBlob.type,
         data: arrayBuffer,
+        userId: state.userId,
         senderNickname: state.nickname,
         senderAvatarColor: state.avatarColor,
         timestampStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1959,6 +2039,7 @@ async function startVoiceRecording() {
       renderVoiceMessage({
         isSelf: true,
         blobUrl: URL.createObjectURL(audioBlob),
+        userId: state.userId,
         author: state.nickname,
         avatarColor: state.avatarColor,
         timestampStr: payload.timestampStr
@@ -2023,11 +2104,15 @@ if (btnMic) {
 
 function handleIncomingVoice(data) {
   try {
+    if (data.userId && data.senderNickname) {
+      processUserProfile(data.userId, data.senderNickname, data.senderAvatarColor);
+    }
     const blob = new Blob([data.data], { type: data.fileType || 'audio/webm' });
     const blobUrl = URL.createObjectURL(blob);
     renderVoiceMessage({
       isSelf: false,
       blobUrl,
+      userId: data.userId || ('usr_' + data.senderNickname),
       author: data.senderNickname,
       avatarColor: data.senderAvatarColor,
       timestampStr: data.timestampStr
@@ -2040,11 +2125,16 @@ function handleIncomingVoice(data) {
 }
 
 function renderVoiceMessage(voiceData) {
-  const isSelf = voiceData.isSelf;
+  const msgUserId = voiceData.userId || (voiceData.isSelf ? state.userId : 'usr_' + voiceData.author);
+  const isSelf = msgUserId === state.userId;
   const wrap = document.createElement('div');
   wrap.className = `message-wrapper ${isSelf ? 'sent' : 'received'}`;
+  wrap.setAttribute('data-user-id', msgUserId);
   
-  const initial = voiceData.author ? voiceData.author.charAt(0).toUpperCase() : 'V';
+  const profile = state.userProfiles.get(msgUserId) || { nickname: voiceData.author || 'System', avatarColor: voiceData.avatarColor || '#8a78f7' };
+  const displayAuthor = profile.nickname;
+  const displayAvatarColor = profile.avatarColor;
+  const initial = displayAuthor ? displayAuthor.charAt(0).toUpperCase() : 'V';
 
   const downloadOverlayHtml = `
     <a href="${voiceData.blobUrl}" download="${escapeHtml(voiceData.fileName || 'voice-note.webm')}" class="btn-download-overlay" title="Download Voice Note">
@@ -2054,12 +2144,12 @@ function renderVoiceMessage(voiceData) {
   `;
 
   wrap.innerHTML = `
-    <div class="msg-avatar" style="background-color: ${voiceData.avatarColor || '#8a78f7'};">
+    <div class="msg-avatar" style="background-color: ${displayAvatarColor};">
       ${initial}
     </div>
     <div class="msg-content">
       <div class="msg-header">
-        <span class="msg-author">${escapeHtml(voiceData.author)}</span>
+        <span class="msg-author">${escapeHtml(displayAuthor)}</span>
         <span class="msg-time">${voiceData.timestampStr}</span>
         <div class="msg-header-actions">
           <button type="button" class="btn-msg-reply" title="Reply">

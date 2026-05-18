@@ -1343,109 +1343,195 @@ html, body {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* --- SETTINGS MODAL --- */
+/* --- PREMIUM GLASSMORPHISM SETTINGS MODAL --- */
+#app-settings-modal .modal-content {
+  background: rgba(22, 21, 32, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  padding: 32px 28px;
+  gap: 22px;
+}
+
 .settings-section {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
 }
 
 .settings-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--primary-light);
+  color: #a59fb8;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.2px;
+  font-family: 'Inter', sans-serif;
 }
 
 .settings-hint {
   font-size: 0.75rem;
   color: var(--text-subtle);
-  margin-top: -2px;
+  margin-top: 2px;
+  line-height: 1.3;
 }
 
-.font-size-picker {
-  display: flex;
-  gap: 8px;
+/* Restyled Text / Time Input Fields */
+.settings-input-wrap {
   width: 100%;
+  position: relative;
 }
 
-.font-btn {
+#app-settings-modal input[type="text"],
+#app-settings-modal input[type="time"] {
+  width: 100%;
+  background: rgba(16, 15, 23, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #ffffff;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: all 0.25s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  box-sizing: border-box;
+}
+
+#app-settings-modal input[type="text"]:focus,
+#app-settings-modal input[type="time"]:focus {
+  border-color: #8a78f7;
+  box-shadow: 0 0 14px rgba(138, 120, 247, 0.5), inset 0 2px 4px rgba(0,0,0,0.3);
+  background: rgba(16, 15, 23, 0.85);
+}
+
+/* Pill-Shaped Segmented Controls */
+.font-size-picker, .disguise-mode-picker {
+  display: flex;
+  background: rgba(16, 15, 23, 0.5);
+  border-radius: 100px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.font-btn, .disguise-btn {
   flex: 1;
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  color: var(--text-muted);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: #928ca8;
+  padding: 10px 16px;
+  border-radius: 100px;
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
+  text-align: center;
 }
 
-.font-btn:hover {
-  border-color: var(--primary);
-  color: var(--text-main);
+.font-btn:hover:not(.active), .disguise-btn:hover:not(.active) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.font-btn.active {
+.font-btn.active, .disguise-btn.active {
   background: var(--gradient-equal);
   color: white;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(138, 120, 247, 0.4);
+  box-shadow: 0 4px 16px rgba(138, 120, 247, 0.5);
+  font-weight: 700;
 }
 
+/* Premium iOS-style Biometric Switch */
+.btn-toggle {
+  width: 52px;
+  height: 30px;
+  border-radius: 100px;
+  background: rgba(16, 15, 23, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.26, 1.55);
+  outline: none;
+  padding: 0;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.btn-toggle .toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #a59fb8;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.26, 1.55);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.btn-toggle.active {
+  background: var(--gradient-equal);
+  border-color: #8a78f7;
+  box-shadow: 0 0 16px rgba(138, 120, 247, 0.5), inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-toggle.active .toggle-knob {
+  left: 24px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Action Buttons Restyling */
 .btn-danger-outline {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(255, 69, 96, 0.1);
-  border: 1px solid rgba(255, 69, 96, 0.4);
-  color: #ff4560;
-  padding: 12px;
-  border-radius: var(--radius-sm);
+  background: rgba(255, 69, 96, 0.08);
+  border: 1px solid rgba(255, 69, 96, 0.3);
+  color: #ff6b81;
+  padding: 14px 20px;
+  border-radius: 14px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   outline: none;
+  width: 100%;
 }
 
 .btn-danger-outline:hover {
   background: #ff4560;
   color: white;
-  box-shadow: 0 4px 16px rgba(255, 69, 96, 0.4);
+  border-color: #ff4560;
+  box-shadow: 0 6px 20px rgba(255, 69, 96, 0.4);
+  transform: translateY(-1px);
 }
 
-/* --- DISGUISE MODE BUTTONS --- */
-.disguise-btn {
-  flex: 1;
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  color: var(--text-muted);
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  outline: none;
-}
-
-.disguise-btn:hover {
-  border-color: var(--primary);
-  color: var(--text-main);
-}
-
-.disguise-btn.active {
+#btn-close-app-settings {
   background: var(--gradient-equal);
   color: white;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(138, 120, 247, 0.4);
+  border: none;
+  padding: 14px 24px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 8px 24px rgba(138, 120, 247, 0.4);
+  width: 100%;
+  margin-top: 12px;
+}
+
+#btn-close-app-settings:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(138, 120, 247, 0.6);
 }
 
 /* --- SCREEN 1B: ANALOG CLOCK --- */
@@ -1664,38 +1750,4 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: white;
 }
 
-/* --- TOGGLE SWITCH --- */
-.btn-toggle {
-  width: 50px;
-  height: 28px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-input);
-  border: 2px solid var(--border-light);
-  cursor: pointer;
-  position: relative;
-  transition: all 0.25s ease;
-  outline: none;
-  padding: 0;
-}
 
-.btn-toggle .toggle-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: all 0.25s cubic-bezier(0.68, -0.55, 0.26, 1.55);
-}
-
-.btn-toggle.active {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.btn-toggle.active .toggle-knob {
-  left: 24px;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}

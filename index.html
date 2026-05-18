@@ -199,6 +199,13 @@
           <video id="local-video-stream" autoplay playsinline muted class="call-video-local hidden"></video>
           <div id="call-audio-avatar" class="call-audio-avatar hidden">🎙️ Audio Call Active</div>
         </div>
+        <div id="call-quality-control" class="call-quality-box hidden">
+          <div class="quality-label-row">
+            <span>📹 Max Bitrate</span>
+            <span><b id="bitrate-display">500</b> kbps</span>
+          </div>
+          <input type="range" id="input-call-bitrate" min="100" max="1000" step="50" value="500" class="quality-slider">
+        </div>
       </div>
 
       <!-- LAST UNLOCKED TIME TOAST NOTIFICATION -->

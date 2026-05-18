@@ -172,6 +172,9 @@ const remoteVideoStream = document.getElementById('remote-video-stream');
 const remoteAudioStream = document.getElementById('remote-audio-stream');
 const localVideoStream = document.getElementById('local-video-stream');
 const callAudioAvatar = document.getElementById('call-audio-avatar');
+const callQualityControl = document.getElementById('call-quality-control');
+const inputCallBitrate = document.getElementById('input-call-bitrate');
+const bitrateDisplay = document.getElementById('bitrate-display');
 
 const burnModal = document.getElementById('burn-modal');
 const btnConfirmBurn = document.getElementById('btn-confirm-burn');
@@ -1380,7 +1383,7 @@ if (btnAcceptCall) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: callType === 'video',
+        video: callType === 'video' ? { frameRate: { ideal: 15, max: 20 } } : false,
         audio: true
       });
       state.localStream = stream;
@@ -1422,7 +1425,7 @@ function handleIncomingCallStream(call) {
     try {
       if (!state.localStream) {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: callType === 'video',
+          video: callType === 'video' ? { frameRate: { ideal: 15, max: 20 } } : false,
           audio: true
         });
         state.localStream = stream;
@@ -1459,6 +1462,12 @@ function handleIncomingCallStream(call) {
 function setupCallHandlers(call, callType) {
   state.activeCall = call;
 
+  if (callType === 'video') {
+    if (callQualityControl) callQualityControl.classList.remove('hidden');
+  } else {
+    if (callQualityControl) callQualityControl.classList.add('hidden');
+  }
+
   call.on('stream', remoteStream => {
     state.remoteStream = remoteStream;
     if (pipCallStatus) pipCallStatus.textContent = `Call in progress`;
@@ -1486,6 +1495,31 @@ function setupCallHandlers(call, callType) {
   });
   call.on('error', () => {
     endCurrentCall();
+  });
+}
+
+if (inputCallBitrate) {
+  inputCallBitrate.addEventListener('input', async (e) => {
+    const kbps = parseInt(e.target.value, 10);
+    if (bitrateDisplay) bitrateDisplay.textContent = kbps;
+
+    if (state.activeCall && state.activeCall.peerConnection) {
+      try {
+        const senders = state.activeCall.peerConnection.getSenders();
+        for (const sender of senders) {
+          if (sender.track && sender.track.kind === 'video') {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = kbps * 1000;
+            await sender.setParameters(params);
+          }
+        }
+      } catch (err) {
+        console.warn("[WebRTC] Error setting maxBitrate parameters:", err);
+      }
+    }
   });
 }
 
@@ -1519,6 +1553,7 @@ function endCurrentCall() {
     remoteAudioStream.srcObject = null;
   }
   if (callAudioAvatar) callAudioAvatar.classList.add('hidden');
+  if (callQualityControl) callQualityControl.classList.add('hidden');
 
   if (pipCallWindow) pipCallWindow.classList.add('hidden');
   if (incomingCallBanner) incomingCallBanner.classList.add('hidden');

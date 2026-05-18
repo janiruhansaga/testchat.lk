@@ -1930,4 +1930,48 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   gap: 8px;
 }
 
+/* --- CALL QUALITY SLIDER --- */
+.call-quality-box {
+  background: rgba(10, 9, 15, 0.9);
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quality-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c9c3de;
+}
+
+.quality-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+  margin: 4px 0;
+}
+
+.quality-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #8a78f7;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(138, 120, 247, 0.8);
+  transition: transform 0.2s ease;
+}
+
+.quality-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
 

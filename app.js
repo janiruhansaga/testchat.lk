@@ -78,7 +78,13 @@ const state = {
   peerInstance: null,
   myPeerId: null,
   activeP2PConnections: new Map(),
-  unsubscribePeers: null
+  unsubscribePeers: null,
+  
+  // Call State
+  incomingCall: null,
+  activeCall: null,
+  localStream: null,
+  remoteStream: null
 };
 
 // --- DOM ELEMENTS ---
@@ -139,6 +145,24 @@ const btnExitChat = document.getElementById('btn-exit-chat');
 const btnSettings = document.getElementById('btn-settings');
 const btnBurnChat = document.getElementById('btn-burn-chat');
 const onlineStatus = document.getElementById('online-status');
+
+// Call DOM Elements
+const btnVoiceCall = document.getElementById('btn-voice-call');
+const btnVideoCall = document.getElementById('btn-video-call');
+const incomingCallBanner = document.getElementById('incoming-call-banner');
+const incomingCallIcon = document.getElementById('incoming-call-icon');
+const incomingCallTitle = document.getElementById('incoming-call-title');
+const incomingCallFrom = document.getElementById('incoming-call-from');
+const btnAcceptCall = document.getElementById('btn-accept-call');
+const btnDeclineCall = document.getElementById('btn-decline-call');
+const pipCallWindow = document.getElementById('pip-call-window');
+const pipDragHandle = document.getElementById('pip-drag-handle');
+const pipCallStatus = document.getElementById('pip-call-status');
+const btnEndCall = document.getElementById('btn-end-call');
+const remoteVideoStream = document.getElementById('remote-video-stream');
+const remoteAudioStream = document.getElementById('remote-audio-stream');
+const localVideoStream = document.getElementById('local-video-stream');
+const callAudioAvatar = document.getElementById('call-audio-avatar');
 
 const burnModal = document.getElementById('burn-modal');
 const btnConfirmBurn = document.getElementById('btn-confirm-burn');
@@ -1176,6 +1200,8 @@ function initPeerJS() {
       setupDataChannel(conn);
     });
 
+    peer.on('call', handleIncomingCallStream);
+
     peer.on('error', (err) => {
       console.warn("[PeerJS] Error:", err);
     });
@@ -1208,6 +1234,12 @@ function setupDataChannel(conn) {
       handleIncomingPhoto(data);
     } else if (data && data.type === 'p2p-voice') {
       handleIncomingVoice(data);
+    } else if (data && data.type === 'call-signal') {
+      handleIncomingCallSignal(data);
+    } else if (data && data.type === 'call-declined') {
+      showToastNotification(`${data.senderNickname} declined the call.`);
+    } else if (data && data.type === 'call-ended') {
+      endCurrentCall();
     }
   });
 
@@ -1217,6 +1249,262 @@ function setupDataChannel(conn) {
 
   conn.on('error', () => {
     state.activeP2PConnections.delete(conn.peer);
+  });
+}
+
+// ==========================================
+// P2P VOICE & VIDEO CALLS (PiP & SILENT RINGING)
+// ==========================================
+
+if (btnVoiceCall) {
+  btnVoiceCall.addEventListener('click', () => initiateCallSignal('voice'));
+}
+if (btnVideoCall) {
+  btnVideoCall.addEventListener('click', () => initiateCallSignal('video'));
+}
+
+function initiateCallSignal(callType) {
+  if (state.activeP2PConnections.size === 0) {
+    showToastNotification("P2P Error: No online peers in room to call.");
+    return;
+  }
+  if (state.activeCall || state.localStream) {
+    showToastNotification("A call is already active.");
+    return;
+  }
+
+  const payload = {
+    type: 'call-signal',
+    callType,
+    senderNickname: state.nickname,
+    senderPeerId: state.myPeerId
+  };
+
+  state.activeP2PConnections.forEach(conn => conn.send(payload));
+  showToastNotification(`Silent ${callType} call signal sent to room members...`);
+}
+
+function handleIncomingCallSignal(data) {
+  if (state.activeCall || state.localStream || incomingCallBanner.classList.contains('active')) {
+    return;
+  }
+
+  state.incomingCall = {
+    senderPeerId: data.senderPeerId,
+    callType: data.callType,
+    senderNickname: data.senderNickname
+  };
+
+  if (incomingCallFrom) incomingCallFrom.textContent = data.senderNickname;
+  if (incomingCallTitle) incomingCallTitle.textContent = `Incoming ${data.callType} Call`;
+  if (incomingCallIcon) incomingCallIcon.textContent = data.callType === 'video' ? '📹' : '📞';
+
+  if (incomingCallBanner) incomingCallBanner.classList.remove('hidden');
+}
+
+if (btnDeclineCall) {
+  btnDeclineCall.addEventListener('click', () => {
+    if (incomingCallBanner) incomingCallBanner.classList.add('hidden');
+    if (state.incomingCall && state.activeP2PConnections.has(state.incomingCall.senderPeerId)) {
+      const conn = state.activeP2PConnections.get(state.incomingCall.senderPeerId);
+      conn.send({ type: 'call-declined', senderNickname: state.nickname });
+    }
+    state.incomingCall = null;
+  });
+}
+
+if (btnAcceptCall) {
+  btnAcceptCall.addEventListener('click', async () => {
+    if (incomingCallBanner) incomingCallBanner.classList.add('hidden');
+    if (!state.incomingCall) return;
+
+    const { senderPeerId, callType, senderNickname } = state.incomingCall;
+    state.incomingCall = null;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: callType === 'video',
+        audio: true
+      });
+      state.localStream = stream;
+
+      if (callType === 'video') {
+        if (localVideoStream) {
+          localVideoStream.srcObject = stream;
+          localVideoStream.classList.remove('hidden');
+        }
+        if (callAudioAvatar) callAudioAvatar.classList.add('hidden');
+      } else {
+        if (localVideoStream) localVideoStream.classList.add('hidden');
+        if (callAudioAvatar) {
+          callAudioAvatar.textContent = "🎙️ Audio Call Active";
+          callAudioAvatar.classList.remove('hidden');
+        }
+      }
+
+      if (pipCallWindow) pipCallWindow.classList.remove('hidden');
+      if (pipCallStatus) pipCallStatus.textContent = `Calling ${senderNickname}...`;
+
+      const call = state.peerInstance.call(senderPeerId, stream, {
+        metadata: { nickname: state.nickname, callType }
+      });
+      setupCallHandlers(call, callType);
+    } catch (err) {
+      console.error("[PeerJS] Error accessing media devices:", err);
+      showToastNotification("Could not access camera or microphone.");
+      endCurrentCall();
+    }
+  });
+}
+
+function handleIncomingCallStream(call) {
+  const callType = call.metadata?.callType || 'voice';
+  const callerNickname = call.metadata?.nickname || 'Peer';
+
+  async function answerCall() {
+    try {
+      if (!state.localStream) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: callType === 'video',
+          audio: true
+        });
+        state.localStream = stream;
+        if (callType === 'video') {
+          if (localVideoStream) {
+            localVideoStream.srcObject = stream;
+            localVideoStream.classList.remove('hidden');
+          }
+          if (callAudioAvatar) callAudioAvatar.classList.add('hidden');
+        } else {
+          if (localVideoStream) localVideoStream.classList.add('hidden');
+          if (callAudioAvatar) {
+            callAudioAvatar.textContent = "🎙️ Audio Call Active";
+            callAudioAvatar.classList.remove('hidden');
+          }
+        }
+      }
+
+      if (pipCallWindow) pipCallWindow.classList.remove('hidden');
+      if (pipCallStatus) pipCallStatus.textContent = `Connected with ${callerNickname}`;
+
+      call.answer(state.localStream);
+      setupCallHandlers(call, callType);
+    } catch (err) {
+      console.error("[PeerJS] Error answering call:", err);
+      showToastNotification("Failed to connect call media.");
+      endCurrentCall();
+    }
+  }
+
+  answerCall();
+}
+
+function setupCallHandlers(call, callType) {
+  state.activeCall = call;
+
+  call.on('stream', remoteStream => {
+    state.remoteStream = remoteStream;
+    if (pipCallStatus) pipCallStatus.textContent = `Call in progress`;
+
+    if (callType === 'video') {
+      if (remoteVideoStream) {
+        remoteVideoStream.srcObject = remoteStream;
+        remoteVideoStream.classList.remove('hidden');
+      }
+      if (callAudioAvatar) callAudioAvatar.classList.add('hidden');
+    } else {
+      if (remoteAudioStream) {
+        remoteAudioStream.srcObject = remoteStream;
+      }
+      if (remoteVideoStream) remoteVideoStream.classList.add('hidden');
+      if (callAudioAvatar) {
+        callAudioAvatar.textContent = `🎙️ Audio Call with ${call.metadata?.nickname || 'Peer'}`;
+        callAudioAvatar.classList.remove('hidden');
+      }
+    }
+  });
+
+  call.on('close', () => {
+    endCurrentCall();
+  });
+  call.on('error', () => {
+    endCurrentCall();
+  });
+}
+
+if (btnEndCall) {
+  btnEndCall.addEventListener('click', () => {
+    state.activeP2PConnections.forEach(conn => conn.send({ type: 'call-ended' }));
+    endCurrentCall();
+  });
+}
+
+function endCurrentCall() {
+  if (state.activeCall) {
+    state.activeCall.close();
+    state.activeCall = null;
+  }
+  if (state.localStream) {
+    state.localStream.getTracks().forEach(track => track.stop());
+    state.localStream = null;
+  }
+  state.remoteStream = null;
+
+  if (localVideoStream) {
+    localVideoStream.srcObject = null;
+    localVideoStream.classList.add('hidden');
+  }
+  if (remoteVideoStream) {
+    remoteVideoStream.srcObject = null;
+    remoteVideoStream.classList.add('hidden');
+  }
+  if (remoteAudioStream) {
+    remoteAudioStream.srcObject = null;
+  }
+  if (callAudioAvatar) callAudioAvatar.classList.add('hidden');
+
+  if (pipCallWindow) pipCallWindow.classList.add('hidden');
+  if (incomingCallBanner) incomingCallBanner.classList.add('hidden');
+  state.incomingCall = null;
+  showToastNotification("Call ended.");
+}
+
+// PiP WINDOW DRAGGING LOGIC
+let isPipDragging = false;
+let pipStartX = 0, pipStartY = 0;
+let pipInitialX = 0, pipInitialY = 0;
+
+if (pipDragHandle && pipCallWindow) {
+  pipDragHandle.addEventListener('pointerdown', e => {
+    isPipDragging = true;
+    pipDragHandle.setPointerCapture(e.pointerId);
+    pipStartX = e.clientX;
+    pipStartY = e.clientY;
+    const rect = pipCallWindow.getBoundingClientRect();
+    pipInitialX = rect.left;
+    pipInitialY = rect.top;
+  });
+
+  pipDragHandle.addEventListener('pointermove', e => {
+    if (!isPipDragging) return;
+    const dx = e.clientX - pipStartX;
+    const dy = e.clientY - pipStartY;
+    let newX = pipInitialX + dx;
+    let newY = pipInitialY + dy;
+
+    newX = Math.max(10, Math.min(window.innerWidth - pipCallWindow.offsetWidth - 10, newX));
+    newY = Math.max(10, Math.min(window.innerHeight - pipCallWindow.offsetHeight - 10, newY));
+
+    pipCallWindow.style.left = `${newX}px`;
+    pipCallWindow.style.top = `${newY}px`;
+    pipCallWindow.style.right = 'auto';
+    pipCallWindow.style.bottom = 'auto';
+  });
+
+  pipDragHandle.addEventListener('pointerup', e => {
+    if (!isPipDragging) return;
+    isPipDragging = false;
+    try { pipDragHandle.releasePointerCapture(e.pointerId); } catch(err){}
   });
 }
 

@@ -1727,4 +1727,195 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: white;
 }
 
+/* --- INCOMING CALL BANNER --- */
+.incoming-call-banner {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 400px;
+  background: rgba(26, 25, 36, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(138, 120, 247, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(138, 120, 247, 0.2);
+  z-index: 100;
+  animation: callBannerSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes callBannerSlide {
+  from { transform: translate(-50%, -30px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.call-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.call-avatar {
+  font-size: 1.8rem;
+  background: rgba(138, 120, 247, 0.2);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--primary-light);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.call-from {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: white;
+}
+
+.call-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-call-accept {
+  background: #06d6a0;
+  color: #100f17;
+  font-weight: 800;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(6, 214, 160, 0.4);
+}
+
+.btn-call-accept:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(6, 214, 160, 0.6);
+}
+
+.btn-call-decline {
+  background: #ff4560;
+  color: white;
+  font-weight: 800;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 69, 96, 0.4);
+}
+
+.btn-call-decline:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(255, 69, 96, 0.6);
+}
+
+/* --- PiP DRAGGABLE CALL WINDOW --- */
+.pip-window {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 260px;
+  background: rgba(16, 15, 23, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.1);
+  z-index: 200;
+  user-select: none;
+  touch-action: none;
+}
+
+.pip-header {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a59fb8;
+}
+
+.pip-header:active {
+  cursor: grabbing;
+}
+
+.btn-call-end {
+  background: #ff4560;
+  color: white;
+  border: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(255, 69, 96, 0.6);
+}
+
+.btn-call-end:hover {
+  transform: scale(1.1);
+  background: #ff2040;
+}
+
+.pip-media-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0c0b10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.call-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.call-video-local {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  width: 70px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 5;
+}
+
+.call-audio-avatar {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #8a78f7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 

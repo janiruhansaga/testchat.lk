@@ -1472,12 +1472,15 @@ html, body {
 
 .analog-clock {
   position: relative;
-  width: 280px;
-  height: 280px;
+  width: 310px;
+  height: 310px;
   border-radius: 50%;
-  background: var(--bg-surface);
-  border: 6px solid var(--bg-surface-elevated);
-  box-shadow: inset 0 8px 24px rgba(0,0,0,0.4), var(--shadow-lg);
+  background: linear-gradient(145deg, #222130, #161520);
+  border: 4px solid #2a283e;
+  box-shadow: 
+    -10px -10px 24px #2b293f,
+    10px 10px 24px #100f17,
+    inset 0 4px 16px rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1491,16 +1494,57 @@ html, body {
   cursor: grabbing;
 }
 
-.clock-mark {
+/* Tick marks container */
+.clock-ticks, .clock-numbers {
   position: absolute;
-  font-weight: 700;
-  font-size: 1.25rem;
-  color: var(--text-muted);
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
 }
-.mark-12 { top: 12px; }
-.mark-3 { right: 16px; }
-.mark-6 { bottom: 12px; }
-.mark-9 { left: 16px; }
+
+.clock-tick {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: 50% 155px; /* Radius of 310px clock */
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1px;
+}
+
+.clock-tick-minor {
+  width: 2px;
+  height: 6px;
+  margin-left: -1px;
+}
+
+.clock-tick-major {
+  width: 4px;
+  height: 14px;
+  margin-left: -2px;
+  background: #b8aaff;
+  box-shadow: 0 0 8px rgba(184, 170, 255, 0.8);
+  border-radius: 2px;
+}
+
+.clock-number {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  top: 50%;
+  left: 50%;
+  margin-top: -16px;
+  margin-left: -16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: #d1c8ff;
+  font-family: 'Inter', sans-serif;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+}
 
 .clock-hand {
   position: absolute;
@@ -1511,55 +1555,63 @@ html, body {
   pointer-events: none;
 }
 
+/* Hands with glowing pastel colors */
 .hand-hour {
-  width: 6px;
-  height: 75px;
-  margin-left: -3px;
-  background: var(--primary-light);
+  width: 8px;
+  height: 82px;
+  margin-left: -4px;
+  background: linear-gradient(180deg, #ff9ebb, #ff7096);
   z-index: 5;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 0 16px rgba(255, 112, 150, 0.8), 0 4px 10px rgba(0,0,0,0.6);
+  border-radius: 6px;
 }
 
 .hand-minute {
-  width: 4px;
-  height: 105px;
-  margin-left: -2px;
-  background: var(--primary);
+  width: 6px;
+  height: 115px;
+  margin-left: -3px;
+  background: linear-gradient(180deg, #d896ff, #8a78f7);
   z-index: 6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 0 16px rgba(138, 120, 247, 0.8), 0 4px 10px rgba(0,0,0,0.6);
+  border-radius: 4px;
 }
 
 .hand-second {
   width: 2px;
-  height: 115px;
+  height: 130px;
   margin-left: -1px;
-  background: var(--danger);
+  background: #ff4560;
   z-index: 7;
+  box-shadow: 0 0 10px #ff4560;
 }
 
 .clock-center-pin {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--text-main);
+  background: #1a1924;
   z-index: 8;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  border: 4px solid var(--primary);
+  box-shadow: 0 0 12px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.3);
+  border: 4px solid #8a78f7;
   pointer-events: none;
 }
 
+/* Digital Display with glowing font */
 .clock-digital-display {
-  font-size: 2.4rem;
-  font-weight: 800;
-  font-family: monospace;
-  letter-spacing: 2px;
-  color: var(--text-main);
-  background: var(--bg-surface);
-  padding: 10px 28px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  font-size: 2.6rem;
+  font-weight: 900;
+  font-family: 'Outfit', monospace, sans-serif;
+  letter-spacing: 3px;
+  color: #ffffff;
+  background: rgba(26, 25, 36, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 36px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(138, 120, 247, 0.3);
+  box-shadow: 0 0 24px rgba(138, 120, 247, 0.3), inset 0 2px 6px rgba(255,255,255,0.1);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
   transition: all 0.2s ease;
 }
 

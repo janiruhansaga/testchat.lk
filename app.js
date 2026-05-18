@@ -1862,6 +1862,40 @@ if (btnPwaDismiss) {
 }
 
 checkPwaInstallPrompt();
+
+function initDetailedClock() {
+  const ticksContainer = document.getElementById('clock-ticks');
+  const numbersContainer = document.getElementById('clock-numbers');
+  if (!ticksContainer || !numbersContainer) return;
+  
+  ticksContainer.innerHTML = '';
+  numbersContainer.innerHTML = '';
+
+  const numberRadius = 110; // Distance from center for the hour numbers
+
+  for (let i = 0; i < 60; i++) {
+    const angle = i * 6; // 360 / 60
+    const tick = document.createElement('div');
+    tick.className = 'clock-tick ' + (i % 5 === 0 ? 'clock-tick-major' : 'clock-tick-minor');
+    tick.style.transform = `rotate(${angle}deg)`;
+    ticksContainer.appendChild(tick);
+  }
+
+  for (let h = 1; h <= 12; h++) {
+    const angle = h * 30; // 360 / 12
+    const rad = (angle - 90) * (Math.PI / 180);
+    const x = Math.round(Math.cos(rad) * numberRadius);
+    const y = Math.round(Math.sin(rad) * numberRadius);
+
+    const num = document.createElement('div');
+    num.className = 'clock-number';
+    num.textContent = h.toString();
+    num.style.transform = `translate(${x}px, ${y}px)`;
+    numbersContainer.appendChild(num);
+  }
+}
+
+initDetailedClock();
 showDisguiseScreen();
 
 // --- ANALOG CLOCK INTERACTION LOGIC ---

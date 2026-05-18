@@ -321,39 +321,16 @@ html, body {
 
 .brand-titles {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
 }
 
 .chat-title {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-main);
-}
-
-.chat-subtitle {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #06d6a0;
-  box-shadow: 0 0 8px #06d6a0;
-  animation: pulse 2s infinite ease-in-out;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 .chat-header-actions {

@@ -83,9 +83,44 @@ const state = {
 
 // --- DOM ELEMENTS ---
 const calcScreen = document.getElementById('calculator-screen');
+const clockScreen = document.getElementById('clock-screen');
 const roomScreen = document.getElementById('room-screen');
 const chatScreen = document.getElementById('chat-screen');
 const stealthDot = document.getElementById('stealth-dot');
+const stealthDotClock = document.getElementById('stealth-dot-clock');
+
+const analogClock = document.getElementById('analog-clock');
+const clockHandHour = document.getElementById('clock-hand-hour');
+const clockHandMinute = document.getElementById('clock-hand-minute');
+const clockHandSecond = document.getElementById('clock-hand-second');
+const clockDigitalDisplay = document.getElementById('clock-digital-display');
+const disguiseBtns = document.querySelectorAll('.disguise-btn');
+const secretTimeInput = document.getElementById('secret-time-input');
+const calcSettingsArea = document.getElementById('calc-settings-area');
+const clockSettingsArea = document.getElementById('clock-settings-area');
+
+function showDisguiseScreen() {
+  const mode = localStorage.getItem('vibe_disguise_mode') || 'calculator';
+  if (mode === 'clock') {
+    if (calcScreen) {
+      calcScreen.classList.remove('active');
+      calcScreen.classList.add('hidden');
+    }
+    if (clockScreen) {
+      clockScreen.classList.remove('hidden');
+      clockScreen.classList.add('active');
+    }
+  } else {
+    if (clockScreen) {
+      clockScreen.classList.remove('active');
+      clockScreen.classList.add('hidden');
+    }
+    if (calcScreen) {
+      calcScreen.classList.remove('hidden');
+      calcScreen.classList.add('active');
+    }
+  }
+}
 
 const calcDisplay = document.getElementById('calc-display');
 const calcHistory = document.getElementById('calc-history');
@@ -327,7 +362,8 @@ function startStealthBackgroundListener() {
           return;
         }
         if (snapshot.size > initialCount && !state.isSecretChatOpen && !state.isRoomSelectOpen) {
-          stealthDot.classList.remove('hidden');
+          if (stealthDot) stealthDot.classList.remove('hidden');
+          if (stealthDotClock) stealthDotClock.classList.remove('hidden');
           initialCount = snapshot.size;
         }
       }, err => {});
@@ -339,7 +375,8 @@ function startStealthBackgroundListener() {
       if (e.key === localKey && !state.isSecretChatOpen && !state.isRoomSelectOpen) {
         const curLen = JSON.parse(localStorage.getItem(localKey) || '[]').length;
         if (curLen > lastLen) {
-          stealthDot.classList.remove('hidden');
+          if (stealthDot) stealthDot.classList.remove('hidden');
+          if (stealthDotClock) stealthDotClock.classList.remove('hidden');
         }
         lastLen = curLen;
       }
@@ -349,15 +386,22 @@ function startStealthBackgroundListener() {
 
 function openRoomSelection() {
   state.isRoomSelectOpen = true;
-  stealthDot.classList.add('hidden');
+  if (stealthDot) stealthDot.classList.add('hidden');
+  if (stealthDotClock) stealthDotClock.classList.add('hidden');
   if (state.unsubscribeStealth) {
     state.unsubscribeStealth();
     state.unsubscribeStealth = null;
   }
   
   resetCalculator();
-  calcScreen.classList.remove('active');
-  calcScreen.classList.add('hidden');
+  if (calcScreen) {
+    calcScreen.classList.remove('active');
+    calcScreen.classList.add('hidden');
+  }
+  if (clockScreen) {
+    clockScreen.classList.remove('active');
+    clockScreen.classList.add('hidden');
+  }
   
   roomIdInput.value = "";
   roomScreen.classList.remove('hidden');
@@ -386,22 +430,28 @@ btnCancelRoom.addEventListener('click', () => {
   roomScreen.classList.add('hidden');
   state.isRoomSelectOpen = false;
 
-  calcScreen.classList.remove('hidden');
-  calcScreen.classList.add('active');
+  showDisguiseScreen();
   startStealthBackgroundListener();
 });
 
 function openSecretChat() {
   state.isSecretChatOpen = true;
-  stealthDot.classList.add('hidden');
+  if (stealthDot) stealthDot.classList.add('hidden');
+  if (stealthDotClock) stealthDotClock.classList.add('hidden');
   if (state.unsubscribeStealth) {
     state.unsubscribeStealth();
     state.unsubscribeStealth = null;
   }
   
   resetCalculator();
-  calcScreen.classList.remove('active');
-  calcScreen.classList.add('hidden');
+  if (calcScreen) {
+    calcScreen.classList.remove('active');
+    calcScreen.classList.add('hidden');
+  }
+  if (clockScreen) {
+    clockScreen.classList.remove('active');
+    clockScreen.classList.add('hidden');
+  }
   
   chatScreen.classList.remove('hidden');
   chatScreen.classList.add('active');
@@ -425,8 +475,7 @@ function lockAndExitChat() {
   roomScreen.classList.remove('active');
   roomScreen.classList.add('hidden');
   
-  calcScreen.classList.remove('hidden');
-  calcScreen.classList.add('active');
+  showDisguiseScreen();
   
   if (state.unsubscribeChat) {
     state.unsubscribeChat();
@@ -519,6 +568,21 @@ function applyChatFontSize(size) {
 const savedFontSize = localStorage.getItem('vibe_chat_font_size') || 'medium';
 applyChatFontSize(savedFontSize);
 
+function updateDisguiseModeUI() {
+  const currentMode = localStorage.getItem('vibe_disguise_mode') || 'calculator';
+  disguiseBtns.forEach(b => {
+    if (b.dataset.mode === currentMode) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+  if (currentMode === 'clock') {
+    if (calcSettingsArea) calcSettingsArea.style.display = 'none';
+    if (clockSettingsArea) clockSettingsArea.style.display = 'flex';
+  } else {
+    if (calcSettingsArea) calcSettingsArea.style.display = 'flex';
+    if (clockSettingsArea) clockSettingsArea.style.display = 'none';
+  }
+}
+
 if (btnAppSettings) {
   btnAppSettings.addEventListener('click', () => {
     const currentSize = localStorage.getItem('vibe_chat_font_size') || 'medium';
@@ -530,8 +594,27 @@ if (btnAppSettings) {
     if (customUnlockInput) {
       customUnlockInput.value = localStorage.getItem('vibe_custom_unlock') || '7788';
     }
+    if (secretTimeInput) {
+      secretTimeInput.value = localStorage.getItem('vibe_secret_time') || '12:15';
+    }
+    updateDisguiseModeUI();
 
     if (appSettingsModal) appSettingsModal.classList.remove('hidden');
+  });
+}
+
+disguiseBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    localStorage.setItem('vibe_disguise_mode', mode);
+    updateDisguiseModeUI();
+    showDisguiseScreen();
+  });
+});
+
+if (secretTimeInput) {
+  secretTimeInput.addEventListener('input', e => {
+    localStorage.setItem('vibe_secret_time', e.target.value);
   });
 }
 
@@ -1755,3 +1838,102 @@ if (btnPwaDismiss) {
 }
 
 checkPwaInstallPrompt();
+showDisguiseScreen();
+
+// --- ANALOG CLOCK INTERACTION LOGIC ---
+let isClockDragging = false;
+let draggedHand = null; // 'hour' or 'minute'
+let currentDraggedHour = 12;
+let currentDraggedMinute = 0;
+
+function updateClockDisplay() {
+  if (isClockDragging || state.isSecretChatOpen || state.isRoomSelectOpen) return;
+  const now = new Date();
+  const s = now.getSeconds();
+  const m = now.getMinutes();
+  const h = now.getHours() % 12;
+
+  const secondAngle = s * 6;
+  const minuteAngle = m * 6 + s * 0.1;
+  const hourAngle = h * 30 + m * 0.5;
+
+  if (clockHandSecond) clockHandSecond.style.transform = `rotate(${secondAngle}deg)`;
+  if (clockHandMinute) clockHandMinute.style.transform = `rotate(${minuteAngle}deg)`;
+  if (clockHandHour) clockHandHour.style.transform = `rotate(${hourAngle}deg)`;
+
+  const digitalTime = `${String(now.getHours()).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  if (clockDigitalDisplay) clockDigitalDisplay.textContent = digitalTime;
+}
+setInterval(updateClockDisplay, 1000);
+updateClockDisplay();
+
+if (analogClock) {
+  analogClock.addEventListener('pointerdown', e => {
+    if (state.isSecretChatOpen || state.isRoomSelectOpen) return;
+    isClockDragging = true;
+    try { analogClock.setPointerCapture(e.pointerId); } catch(err){}
+
+    const rect = analogClock.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(e.clientY - cy, e.clientX - cx);
+
+    if (dist < 60) {
+      draggedHand = 'hour';
+    } else {
+      draggedHand = 'minute';
+    }
+    handleClockDrag(e);
+  });
+
+  analogClock.addEventListener('pointermove', e => {
+    if (!isClockDragging) return;
+    handleClockDrag(e);
+  });
+
+  function handleClockDrag(e) {
+    const rect = analogClock.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const rad = Math.atan2(e.clientY - cy, e.clientX - cx);
+    let deg = (rad * 180 / Math.PI + 90 + 360) % 360;
+
+    if (draggedHand === 'minute') {
+      currentDraggedMinute = Math.round(deg / 6) % 60;
+      const angle = currentDraggedMinute * 6;
+      if (clockHandMinute) clockHandMinute.style.transform = `rotate(${angle}deg)`;
+    } else if (draggedHand === 'hour') {
+      let h = Math.round(deg / 30) % 12;
+      if (h === 0) h = 12;
+      currentDraggedHour = h;
+      const angle = (currentDraggedHour % 12) * 30;
+      if (clockHandHour) clockHandHour.style.transform = `rotate(${angle}deg)`;
+    }
+
+    const formattedTime = `${String(currentDraggedHour).padStart(2, '0')}:${String(currentDraggedMinute).padStart(2, '0')}`;
+    if (clockDigitalDisplay) clockDigitalDisplay.textContent = formattedTime;
+  }
+
+  function finishClockDrag(e) {
+    if (!isClockDragging) return;
+    isClockDragging = false;
+    try { analogClock.releasePointerCapture(e.pointerId); } catch(err){}
+
+    const secretTime = localStorage.getItem('vibe_secret_time') || '12:15';
+    const parts = secretTime.split(':');
+    let secretH = parseInt(parts[0], 10) % 12;
+    if (secretH === 0) secretH = 12;
+    const secretM = parseInt(parts[1], 10);
+    const targetSecret = `${String(secretH).padStart(2, '0')}:${String(secretM).padStart(2, '0')}`;
+
+    const formattedTime = `${String(currentDraggedHour).padStart(2, '0')}:${String(currentDraggedMinute).padStart(2, '0')}`;
+
+    if (formattedTime === targetSecret) {
+      state.isDecoyMode = false;
+      openRoomSelection();
+    }
+  }
+
+  analogClock.addEventListener('pointerup', finishClockDrag);
+  analogClock.addEventListener('pointercancel', finishClockDrag);
+}

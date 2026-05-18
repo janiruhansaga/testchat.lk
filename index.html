@@ -74,6 +74,37 @@
       </div>
     </section>
 
+    <!-- SCREEN 1B: ANALOG CLOCK DISGUISE -->
+    <section id="clock-screen" class="screen hidden" aria-label="Analog Clock Disguise">
+      <div class="calc-header" style="width:100%;">
+        <div class="calc-brand">
+          <span class="calc-title">Time<span class="accent">+</span></span>
+          <span class="calc-mode">Analog</span>
+          <span id="stealth-dot-clock" class="stealth-dot hidden" title="Solar Active"></span>
+        </div>
+      </div>
+      
+      <div class="clock-wrapper">
+        <div id="analog-clock" class="analog-clock">
+          <!-- 12 Hour Markers -->
+          <div class="clock-mark mark-12">12</div>
+          <div class="clock-mark mark-3">3</div>
+          <div class="clock-mark mark-6">6</div>
+          <div class="clock-mark mark-9">9</div>
+          <!-- Clock Hands -->
+          <div id="clock-hand-hour" class="clock-hand hand-hour"></div>
+          <div id="clock-hand-minute" class="clock-hand hand-minute"></div>
+          <div id="clock-hand-second" class="clock-hand hand-second"></div>
+          <div class="clock-center-pin"></div>
+        </div>
+        <div id="clock-digital-display" class="clock-digital-display">12:00</div>
+      </div>
+      
+      <div class="clock-footer-hint">
+        <span>Touch and drag hands to set time</span>
+      </div>
+    </section>
+
     <!-- SCREEN 1.5: ROOM SELECTION -->
     <section id="room-screen" class="screen hidden" aria-label="Room Selection">
       <div class="room-container">
@@ -274,11 +305,27 @@
         </div>
 
         <div class="settings-section">
+          <label class="settings-label">Disguise Screen Mode</label>
+          <div style="display:flex; gap:8px; width:100%;">
+            <button type="button" class="disguise-btn active" data-mode="calculator">Calculator</button>
+            <button type="button" class="disguise-btn" data-mode="clock">Analog Clock</button>
+          </div>
+        </div>
+
+        <div class="settings-section" id="calc-settings-area">
           <label class="settings-label" for="custom-unlock-input">Secret Unlock Code (Calculator)</label>
           <div class="input-group" style="margin-bottom: 4px;">
             <input type="text" id="custom-unlock-input" placeholder="e.g. 7788" maxlength="8" pattern="\d+" autocomplete="off">
           </div>
           <span class="settings-hint">Enter numbers only. Don't forget to press "=" when unlocking!</span>
+        </div>
+
+        <div class="settings-section" id="clock-settings-area" style="display:none;">
+          <label class="settings-label" for="secret-time-input">Secret Time Unlock (Clock)</label>
+          <div class="input-group" style="margin-bottom: 4px;">
+            <input type="time" id="secret-time-input" value="12:15" autocomplete="off" style="width:100%; background:transparent; border:none; color:white; font-size:1.1rem; outline:none; font-family:inherit;">
+          </div>
+          <span class="settings-hint">Drag clock hands to this exact time to unlock!</span>
         </div>
 
         <div class="settings-section" style="border-top: 1px solid var(--border-light); padding-top: 16px; margin-top: 8px;">

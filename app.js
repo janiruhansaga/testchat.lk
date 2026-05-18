@@ -2118,7 +2118,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-function handlePwaPrompt(e) {
+window.handlePwaPrompt = function(e) {
   deferredPrompt = e;
   if (window.matchMedia('(display-mode: standalone)').matches || localStorage.getItem('vibe_pwa_dismissed')) {
     return;
@@ -2126,15 +2126,15 @@ function handlePwaPrompt(e) {
   if (installModalText) installModalText.textContent = "Install this app to your home screen for the best full-screen stealth experience.";
   if (installBtnWrap) installBtnWrap.classList.remove('hidden');
   if (installModal) installModal.classList.remove('hidden');
-}
+};
 
 if (window._pwaPromptEvent) {
-  handlePwaPrompt(window._pwaPromptEvent);
+  window.handlePwaPrompt(window._pwaPromptEvent);
 }
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
-  handlePwaPrompt(e);
+  window.handlePwaPrompt(e);
 });
 
 function checkPwaInstallPrompt() {

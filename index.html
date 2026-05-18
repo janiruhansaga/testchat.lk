@@ -19,6 +19,9 @@
     window.addEventListener('beforeinstallprompt', function(e) {
       e.preventDefault();
       window._pwaPromptEvent = e;
+      if (window.handlePwaPrompt) {
+        window.handlePwaPrompt(e);
+      }
     });
   </script>
 </head>
